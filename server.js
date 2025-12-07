@@ -536,11 +536,7 @@ io.on('connection', socket => {
   });
 });
 
-const path = require('path');
-const express = require('express');
-const app = express();
-const http = require('http');
-const server = http.createServer(app);
+
 
 // static ფაილების სერვირება
 app.use(express.static(path.join(__dirname, 'public')));
@@ -555,6 +551,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
+
 
 
 
