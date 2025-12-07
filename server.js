@@ -536,7 +536,26 @@ io.on('connection', socket => {
   });
 });
 
+const path = require('path');
+const express = require('express');
+const app = express();
+const http = require('http');
+const server = http.createServer(app);
+
+// static ფაილების სერვირება
+app.use(express.static(path.join(__dirname, 'public')));
+
+// root როუტი
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // start
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+
+
 
