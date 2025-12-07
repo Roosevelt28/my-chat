@@ -1,0 +1,23 @@
+{
+  "name": "chat-proto",
+  "version": "1.0.0",
+  "description": "Minimal real-time chat prototype with Socket.io",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.5.0",
+    "connect-sqlite3": "^0.9.16",
+    "cors": "^2.8.5",
+    "express": "^4.22.1",
+    "express-session": "^1.18.2",
+    "multer": "^2.0.2",
+    "pg": "^8.16.3",
+    "socket.io": "^4.8.1",
+    "uuid": "^13.0.0"
+  }
+}
