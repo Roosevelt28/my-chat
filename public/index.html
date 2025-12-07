@@ -6,6 +6,7 @@
   <title>ჩატი</title>
   <link rel="stylesheet" href="/styles.css" />
   <style>
+    /* Modal + small helpers (kept from your original) */
     .modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); }
     .modal.hidden { display: none; }
     .modal-content { background: #111; padding: 16px; border-radius: 8px; width: 320px; max-width: 90%; position: relative; }
@@ -13,9 +14,66 @@
     .controls { display:flex; gap:8px; align-items:center; }
     #logoutBtn { background: transparent; border: 1px solid rgba(255,255,255,0.06); color: inherit; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
     #logoutBtn:hover { background: rgba(255,255,255,0.03); }
-    .file-label { display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+    .file-label { display:inline-flex; align-items:center; gap:6px; cursor:pointer; position:relative; }
     .file-label input[type="file"] { position:absolute; width:0.1px; height:0.1px; opacity:0; overflow:hidden; z-index:-1; }
     .avatar-large { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; }
+
+    /* Composer icon-only layout */
+    .composer {
+      display: grid;
+      grid-template-columns: 140px 1fr repeat(5, 44px);
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid rgba(255,255,255,0.02);
+      align-items: center;
+    }
+    .composer select, .composer input[type="text"] {
+      padding: 8px;
+      border-radius: 8px;
+      border: 0;
+      background: rgba(255,255,255,0.02);
+      color: inherit;
+    }
+    .composer input[type="text"] { padding: 10px; width:100%; }
+
+    /* Icon button */
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.02);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease, opacity 120ms ease;
+    }
+    .icon-btn:hover:not(:disabled) { transform: translateY(-2px); background: rgba(255,255,255,0.04); }
+    .icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .icon { width:20px; height:20px; fill: #e6eef6; }
+
+    /* Recording state */
+    .icon-btn.recording { background: linear-gradient(90deg,#b91c1c,#ef4444); }
+    .icon-btn.recording .icon { fill: #fff; }
+
+    /* Messages area basic styles (ensure text visible) */
+    .messages { padding: 12px; overflow:auto; display:flex; flex-direction:column; gap:10px; min-height: 300px; }
+    .message { display:flex; gap:10px; align-items:flex-start; max-width:70%; }
+    .message .avatar { width:36px; height:36px; border-radius:50%; background:#0e1628; flex:0 0 36px; }
+    .message .content { background: rgba(255,255,255,0.03); color: #e6eef6; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.02); word-break:break-word; }
+    .message.me .content { background: linear-gradient(90deg,#0ea5a4,#0891b2); color:#042027; }
+    .msg-text { color: #e6eef6; font-size:14px; line-height:1.4; white-space:pre-wrap; margin:0 0 6px 0; }
+    .meta { font-size:11px; color: rgba(148,163,184,0.9); text-align:right; margin-top:6px; }
+
+    /* Uploaded media */
+    img.uploaded { max-width:240px; border-radius:8px; display:block; margin-top:8px; }
+    audio.uploaded { display:block; margin-top:8px; width:100%; max-width:240px; }
+
+    /* Responsive */
+    @media (max-width:900px) {
+      .composer { grid-template-columns: 1fr repeat(5, 44px); }
+      .app { padding:8px; }
+    }
   </style>
 </head>
 <body>
@@ -28,6 +86,7 @@
 
       <main id="messages" class="messages"></main>
 
+      <!-- Composer: icon-only controls -->
       <form id="msgForm" class="composer">
         <select id="recipientSelect">
           <option value="">საერთო</option>
@@ -35,18 +94,27 @@
 
         <input id="msgInput" autocomplete="off" placeholder="ტექსტი..." />
 
-        <label class="file-label" for="photoInput">
-          <input id="photoInput" type="file" accept="image/*" />
-          <span>ფოტო</span>
-        </label>
+        <!-- Photo: hidden input + icon-only button -->
+        <input id="photoInput" type="file" accept="image/*" hidden />
+        <button type="button" id="btnPhoto" class="icon-btn" title="ფოტო" aria-label="Photo">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2l1-2h8l1 2h2a2 2 0 0 1 2 2v12zM7 12l3-3 3 3 3-3 4 4v4H5v-4l2-2z"/></svg>
+        </button>
 
-        <div class="recorder">
-          <button type="button" id="recordBtn">ჩაწერა</button>
-          <button type="button" id="stopBtn" disabled>შეჩერება</button>
-          <button type="button" id="sendAudioBtn" disabled>გაგზავნა (ხმა)</button>
-        </div>
+        <!-- Voice: record / stop / send (icon-only) -->
+        <button type="button" id="recordBtn" class="icon-btn" title="ჩაწერა" aria-label="Record">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zM19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-2.08A7 7 0 0 0 19 11z"/></svg>
+        </button>
+        <button type="button" id="stopBtn" class="icon-btn" title="გაჩერება" aria-label="Stop" disabled>
+          <svg viewBox="0 0 24 24" class="icon"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
+        </button>
+        <button type="button" id="sendAudioBtn" class="icon-btn" title="ხმის გაგზავნა" aria-label="Send voice" disabled>
+          <svg viewBox="0 0 24 24" class="icon"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>
+        </button>
 
-        <button type="submit" class="send-btn">გაგზავნა</button>
+        <!-- Send text: icon-only -->
+        <button type="submit" id="sendBtn" class="icon-btn" title="გაგზავნა" aria-label="Send">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>
+        </button>
       </form>
     </aside>
 
@@ -112,68 +180,241 @@
     </div>
   </div>
 
+  <audio id="audioPreview" controls style="display:none"></audio>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="/client.js"></script>
 
   <script>
+    // Minimal inline wiring to connect the new icon-only controls.
+    // This augments your existing client.js behavior without replacing it.
+
+    const socket = io();
+
+    const messagesEl = document.getElementById('messages');
+    const recipientSelect = document.getElementById('recipientSelect');
+    const msgForm = document.getElementById('msgForm');
+    const msgInput = document.getElementById('msgInput');
+
+    const photoInput = document.getElementById('photoInput');
+    const btnPhoto = document.getElementById('btnPhoto');
+
+    const recordBtn = document.getElementById('recordBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const sendAudioBtn = document.getElementById('sendAudioBtn');
+    const audioPreview = document.getElementById('audioPreview');
+
+    // Helper to render messages (robust)
+    function addMessage(msg) {
+      const text = (msg && (msg.text || msg.message || msg.body || '')) || '';
+      const mediaType = msg && (msg.media_type || (msg.media && msg.media.type) || msg.type) || null;
+      const mediaUrl = msg && (msg.media_url || (msg.media && msg.media.url) || msg.url) || null;
+      const username = (msg && (msg.username || msg.user || msg.from_name)) || 'Guest';
+      const ts = msg && (msg.ts || msg.time || Date.now());
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'message';
+      if (msg && (msg.mine || (window.currentUserId && msg.from_user === window.currentUserId))) wrapper.classList.add('me');
+      else wrapper.classList.add('other');
+
+      const avatarDiv = document.createElement('div');
+      avatarDiv.className = 'avatar';
+      if (msg && msg.avatar) {
+        const img = document.createElement('img');
+        img.src = msg.avatar;
+        img.style.width = '36px';
+        img.style.height = '36px';
+        img.style.borderRadius = '50%';
+        avatarDiv.appendChild(img);
+      }
+
+      const content = document.createElement('div');
+      content.className = 'content';
+
+      if (text !== '') {
+        const p = document.createElement('div');
+        p.className = 'msg-text';
+        p.textContent = text;
+        content.appendChild(p);
+      }
+
+      if (mediaType === 'image' && mediaUrl) {
+        const im = document.createElement('img');
+        im.className = 'uploaded';
+        im.src = mediaUrl;
+        content.appendChild(im);
+      }
+
+      if (mediaType === 'audio' && mediaUrl) {
+        const a = document.createElement('audio');
+        a.className = 'uploaded';
+        a.controls = true;
+        a.src = mediaUrl;
+        content.appendChild(a);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = `${username} • ${new Date(ts).toLocaleTimeString()}`;
+      content.appendChild(meta);
+
+      wrapper.appendChild(avatarDiv);
+      wrapper.appendChild(content);
+      messagesEl.appendChild(wrapper);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // Socket listeners (basic)
+    socket.on('message', m => addMessage(m));
+    socket.on('privateMessage', m => addMessage(m));
+    socket.on('users', users => {
+      // populate recipientSelect (simple)
+      recipientSelect.innerHTML = '<option value="">საერთო</option>';
+      users.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.username;
+        opt.textContent = u.username;
+        recipientSelect.appendChild(opt);
+      });
+    });
+    socket.on('onlineCount', ({ count, users }) => {
+      const el = document.getElementById('onlineCount');
+      if (el) el.textContent = (users && users.length) ? users.length : (count || 0);
+    });
+
+    // Send text (submit)
+    msgForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = msgInput.value.trim();
+      const to = recipientSelect.value || null;
+      if (!text) return;
+      if (!to) socket.emit('chatMessage', { text, media: null });
+      else socket.emit('privateMessage', { toUsername: to, text, media: null });
+      msgInput.value = '';
+    });
+
+    // Photo: open file dialog and upload
+    if (btnPhoto && photoInput) {
+      btnPhoto.addEventListener('click', () => photoInput.click());
+      photoInput.addEventListener('change', async () => {
+        const file = photoInput.files?.[0];
+        if (!file) return;
+        const form = new FormData();
+        form.append('photo', file);
+        try {
+          const res = await fetch('/api/upload/photo', { method: 'POST', body: form });
+          const data = await res.json();
+          if (!data.ok) { alert(data.error || 'Photo upload failed'); return; }
+          const to = recipientSelect.value || null;
+          if (!to) socket.emit('chatMessage', { text: '', media: { type: 'image', url: data.url } });
+          else socket.emit('privateMessage', { toUsername: to, text: '', media: { type: 'image', url: data.url } });
+        } catch (err) {
+          console.error(err);
+          alert('ფოტოს ატვირთვა ვერ მოხერხდა');
+        } finally {
+          photoInput.value = '';
+        }
+      });
+    }
+
+    // Voice recording (MediaRecorder)
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let audioBlob = null;
+
+    async function startRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) audioChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          audioPreview.src = URL.createObjectURL(audioBlob);
+          audioPreview.style.display = 'block';
+          sendAudioBtn.disabled = false;
+        };
+        mediaRecorder.start();
+        recordBtn.classList.add('recording');
+        stopBtn.disabled = false;
+        sendAudioBtn.disabled = true;
+      } catch (err) {
+        console.error(err);
+        alert('მიკროფონზე წვდომა ვერ მოხერხდა');
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(t => t.stop());
+      }
+      recordBtn.classList.remove('recording');
+      stopBtn.disabled = true;
+    }
+
+    async function sendRecordedAudio() {
+      if (!audioBlob) return;
+      const form = new FormData();
+      form.append('audio', audioBlob, `voice-${Date.now()}.webm`);
+      try {
+        const res = await fetch('/api/upload/audio', { method: 'POST', body: form });
+        const data = await res.json();
+        if (!data.ok) { alert(data.error || 'Audio upload failed'); return; }
+        const to = recipientSelect.value || null;
+        if (!to) socket.emit('chatMessage', { text: '', media: { type: 'audio', url: data.url } });
+        else socket.emit('privateMessage', { toUsername: to, text: '', media: { type: 'audio', url: data.url } });
+
+        audioPreview.style.display = 'none';
+        audioPreview.src = '';
+        audioBlob = null;
+        sendAudioBtn.disabled = true;
+      } catch (err) {
+        console.error(err);
+        alert('ხმის ატვირთვა ვერ მოხერხდა');
+      }
+    }
+
+    recordBtn.addEventListener('click', () => {
+      if (!mediaRecorder || mediaRecorder.state === 'inactive') startRecording();
+    });
+    stopBtn.addEventListener('click', stopRecording);
+    sendAudioBtn.addEventListener('click', sendRecordedAudio);
+
+    // Small UX: Enter to send text
+    msgInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        msgForm.requestSubmit();
+      }
+    });
+
+    // Basic auth modal wiring (kept minimal)
     const loginModal = document.getElementById('loginModal');
     const registerModal = document.getElementById('registerModal');
     const openRegisterBtn = document.getElementById('openRegisterBtn');
     const openLoginBtn = document.getElementById('openLoginBtn');
     const closeLogin = document.getElementById('closeLogin');
     const closeRegister = document.getElementById('closeRegister');
-    const photoInput = document.getElementById('photoInput');
 
-    function showLogin() {
-      if (loginModal) loginModal.classList.remove('hidden');
-      if (registerModal) registerModal.classList.add('hidden');
-    }
-    function showRegister() {
-      if (registerModal) registerModal.classList.remove('hidden');
-      if (loginModal) loginModal.classList.add('hidden');
-    }
+    function showLogin(){ if(loginModal) loginModal.classList.remove('hidden'); if(registerModal) registerModal.classList.add('hidden'); }
+    function showRegister(){ if(registerModal) registerModal.classList.remove('hidden'); if(loginModal) loginModal.classList.add('hidden'); }
 
-    if (openRegisterBtn) openRegisterBtn.addEventListener('click', showRegister);
-    if (openLoginBtn) openLoginBtn.addEventListener('click', showLogin);
-    if (closeLogin) closeLogin.addEventListener('click', () => loginModal.classList.add('hidden'));
-    if (closeRegister) closeRegister.addEventListener('click', () => registerModal.classList.add('hidden'));
+    if(openRegisterBtn) openRegisterBtn.addEventListener('click', showRegister);
+    if(openLoginBtn) openLoginBtn.addEventListener('click', showLogin);
+    if(closeLogin) closeLogin.addEventListener('click', ()=> loginModal.classList.add('hidden'));
+    if(closeRegister) closeRegister.addEventListener('click', ()=> registerModal.classList.add('hidden'));
+    document.addEventListener('keydown', (e)=> { if(e.key==='Escape'){ if(loginModal) loginModal.classList.add('hidden'); if(registerModal) registerModal.classList.add('hidden'); }});
+    [loginModal, registerModal].forEach(modal => { if(!modal) return; modal.addEventListener('click', (e)=> { if(e.target===modal) modal.classList.add('hidden'); }); });
 
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        if (loginModal) loginModal.classList.add('hidden');
-        if (registerModal) registerModal.classList.add('hidden');
-      }
-    });
-
-    [loginModal, registerModal].forEach(modal => {
-      if (!modal) return;
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.classList.add('hidden');
-      });
-    });
-
-    (async () => {
+    // Expose currentUserId if /api/me returns it (used to mark own messages)
+    (async function setCurrentUserId(){
       try {
         const res = await fetch('/api/me', { credentials: 'include' });
         const data = await res.json();
-        if (!data.user) {
-          showLogin();
-        } else {
-          if (loginModal) loginModal.classList.add('hidden');
-          if (registerModal) registerModal.classList.add('hidden');
-        }
-      } catch {
-        showLogin();
-      }
+        if (data.user) window.currentUserId = data.user.id;
+      } catch {}
     })();
-
-    const fileLabelSpan = document.querySelector('.file-label span');
-    if (photoInput && fileLabelSpan) {
-      photoInput.addEventListener('change', () => {
-        const count = photoInput.files?.length || 0;
-        fileLabelSpan.textContent = count > 0 ? `არჩეული ფაილი${count > 1 ? 'ები' : ''}: ${count}` : 'ფოტო';
-      });
-    }
   </script>
 </body>
 </html>
