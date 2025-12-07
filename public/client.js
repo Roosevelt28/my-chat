@@ -663,3 +663,25 @@ function endCall() {
   currentCallTarget = null;
 }
 
+// Optional: expand input while typing on mobile
+(function() {
+  const input = document.querySelector('.composer input[type="text"]');
+  if (!input) return;
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
+  }
+
+  input.addEventListener('focus', () => {
+    if (isMobile()) input.classList.add('typing-expanded');
+  });
+  input.addEventListener('blur', () => {
+    input.classList.remove('typing-expanded');
+  });
+
+  // Optional: expand when user starts typing (keydown)
+  input.addEventListener('input', () => {
+    if (isMobile()) input.classList.add('typing-expanded');
+  });
+})();
+
