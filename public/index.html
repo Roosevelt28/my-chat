@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ka">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ჩატი</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    /* მცირე სტილი მოდალებისთვის (თუ styles.css-ში არ გაქვთ) */
+    .modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); }
+    .modal.hidden { display: none; }
+    .modal-content { background: #111; padding: 16px; border-radius: 8px; width: 320px; max-width: 90%; position: relative; }
+    .modal .close { position: absolute; right: 12px; top: 8px; background: transparent; border: none; color: #fff; cursor: pointer; }
+    /* მცირე სტილი კონტროლებისთვის */
+    .controls { display:flex; gap:8px; align-items:center; }
+    #logoutBtn { background: transparent; border: 1px solid rgba(255,255,255,0.06); color: inherit; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+    #logoutBtn:hover { background: rgba(255,255,255,0.03); }
+    .file-label { display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+    .file-label input[type="file"] { position:absolute; width:0.1px; height:0.1px; opacity:0; overflow:hidden; z-index:-1; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="left-col">
+      <div class="header-left">
+        <div class="brand">ჩატი</div>
+        <div id="onlineIndicator" class="online-indicator">ონლაინ: <span id="onlineCount">0</span></div>
+      </div>
+
+      <main id="messages" class="messages"></main>
+
+      <form id="msgForm" class="composer">
+        <select id="recipientSelect">
+          <option value="">საერთო</option>
+        </select>
+
+        <input id="msgInput" autocomplete="off" placeholder="ტექსტი..." />
+
+        <label class="file-label" for="photoInput">
+          <input id="photoInput" type="file" accept="image/*" />
+          <span>ფოტო</span>
+        </label>
+
+        <div class="recorder">
+          <button type="button" id="recordBtn">ჩაწერა</button>
+          <button type="button" id="stopBtn" disabled>შეჩერება</button>
+          <button type="button" id="sendAudioBtn" disabled>გაგზავნა (ხმა)</button>
+        </div>
+
+        <button type="submit" class="send-btn">გაგზავნა</button>
+      </form>
+    </aside>
+
+    <aside class="right-col">
+      <div class="controls">
+        <!-- ახალი: გასვლა -->
+        <button id="logoutBtn" class="send-btn">გასვლა</button>
+
+        <!-- პროფილი და ადმინი -->
+        <button id="openProfileBtn">პროფილი</button>
+        <button id="openAdminBtn">ადმინ</button>
+      </div>
+
+      <div class="users-list" id="usersList"></div>
+    </aside>
+  </div>
+
+  <!-- login modal (პირველი, ნაგულისხმევად გამოჩნდება) -->
+  <div id="loginModal" class="modal">
+    <div class="modal-content">
+      <button id="closeLogin" class="close">X</button>
+      <h3>შესვლა</h3>
+      <form id="loginForm">
+        <input id="login_username" placeholder="ნიკნეიმი" required />
+        <input id="login_password" placeholder="პაროლი" type="password" required />
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button type="submit" class="send-btn">შესვლა</button>
+          <button type="button" id="openRegisterBtn" class="send-btn">რეგისტრაცია</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- registration modal (მეორე, ნაგულისხმევად დამალულია) -->
+  <div id="registerModal" class="modal hidden">
+    <div class="modal-content">
+      <button id="closeRegister" class="close">X</button>
+      <h3>რეგისტრაცია</h3>
+      <form id="registerForm">
+        <input id="reg_first" placeholder="სახელი" />
+        <input id="reg_last" placeholder="გვარი" />
+        <input id="reg_nick" placeholder="ნიკნეიმი (უნიკალური)" required />
+        <input id="reg_email" placeholder="მეილი (არასავალდებულო)" type="email" />
+        <input id="reg_age" placeholder="ასაკი" type="number" min="1" />
+        <input id="reg_password" placeholder="პაროლი" type="password" required />
+        <label>ავატარი <input id="reg_avatar" type="file" accept="image/*" /></label>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button type="submit" class="send-btn">რეგისტრაცია</button>
+          <button type="button" id="openLoginBtn" class="send-btn">უკან შესვლა</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- profile modal -->
+  <div id="profileModal" class="modal hidden">
+    <div class="modal-content">
+      <button id="closeProfile" class="close">X</button>
+      <h3 id="profileName">პროფილი</h3>
+      <img id="profileAvatar" src="" alt="avatar" class="avatar-large" />
+      <div id="profileInfo"></div>
+      <div style="margin-top:8px">
+        <button id="sendPmBtn" class="send-btn">შეტყობინების გაგზავნა</button>
+        <button id="viewPhotosBtn" class="send-btn">ფოტოების ნახვა</button>
+        <button id="voiceCallBtn" class="send-btn">ხმოვანი ზარი</button>
+        <button id="videoCallBtn" class="send-btn">ვიდეო ზარი</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- admin modal -->
+  <div id="adminModal" class="modal hidden">
+    <div class="modal-content">
+      <button id="closeAdmin" class="close">X</button>
+      <h3>ადმინ პანელი</h3>
+      <div id="adminContent"></div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+
+  <script>
+    // ელემენტების მიბმა
+    const loginModal = document.getElementById('loginModal');
+    const registerModal = document.getElementById('registerModal');
+    const openRegisterBtn = document.getElementById('openRegisterBtn');
+    const openLoginBtn = document.getElementById('openLoginBtn');
+    const closeLogin = document.getElementById('closeLogin');
+    const closeRegister = document.getElementById('closeRegister');
+
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // ჩვენება/დამალვა
+    function showLogin() {
+      if (loginModal) loginModal.classList.remove('hidden');
+      if (registerModal) registerModal.classList.add('hidden');
+    }
+    function showRegister() {
+      if (registerModal) registerModal.classList.remove('hidden');
+      if (loginModal) loginModal.classList.add('hidden');
+    }
+
+    // ღილაკები
+    if (openRegisterBtn) openRegisterBtn.addEventListener('click', showRegister);
+    if (openLoginBtn) openLoginBtn.addEventListener('click', showLogin);
+
+    // დახურვა ღილაკებით
+    if (closeLogin) closeLogin.addEventListener('click', () => loginModal.classList.add('hidden'));
+    if (closeRegister) closeRegister.addEventListener('click', () => registerModal.classList.add('hidden'));
+
+    // Esc-ით დახურვა
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (loginModal) loginModal.classList.add('hidden');
+        if (registerModal) registerModal.classList.add('hidden');
+      }
+    });
+
+    // overlay-ზე კლიკით დახურვა (თუ დააჭირეს backdrop-ს)
+    [loginModal, registerModal].forEach(modal => {
+      if (!modal) return;
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.add('hidden');
+      });
+    });
+
+    // ნაგულისხმევად: პირველ რიგში შესვლა უნდა იყოს ხილული
+    (async () => {
+      try {
+        const res = await fetch('/api/me', { credentials: 'include' });
+        const data = await res.json();
+        if (!data.user) {
+          showLogin();
+        } else {
+          if (loginModal) loginModal.classList.add('hidden');
+          if (registerModal) registerModal.classList.add('hidden');
+        }
+      } catch {
+        showLogin();
+      }
+    })();
+
+    // მცირე UX: file-label ტექსტი აჩვენებს არჩეულ ფაილებს
+    const photoInput = document.getElementById('photoInput');
+    const fileLabelSpan = document.querySelector('.file-label span');
+    if (photoInput && fileLabelSpan) {
+      photoInput.addEventListener('change', () => {
+        const count = photoInput.files?.length || 0;
+        fileLabelSpan.textContent = count > 0 ? `არჩეული ფაილი${count > 1 ? 'ები' : ''}: ${count}` : 'ფოტო';
+      });
+    }
+
+    // Logout handler
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        try {
+          const res = await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+          // try parse response if JSON
+          let data = {};
+          try { data = await res.json(); } catch (e) { /* ignore */ }
+
+          // clear local state
+          try { localStorage.removeItem('chat_username'); } catch (e) {}
+          // attempt to disconnect socket (client.js may re-initiate)
+          try { if (typeof io !== 'undefined') { const s = io(); s.disconnect(); } } catch (e) {}
+
+          // show login modal
+          if (loginModal) loginModal.classList.remove('hidden');
+
+          alert((data && data.ok) ? 'თქვენ წარმატებით გამოვედით' : 'თქვენ გამოვედით');
+        } catch (err) {
+          console.error('Logout error', err);
+          alert('გასვლა ვერ შესრულდა, სცადეთ თავიდან');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
+
