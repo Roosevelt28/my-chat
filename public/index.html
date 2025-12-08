@@ -1,421 +1,624 @@
 <!doctype html>
 <html lang="ka">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>ჩატი</title>
-  <link rel="stylesheet" href="/styles.css" />
-  <style>
-    /* Modal + small helpers (kept from your original) */
-    .modal { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); }
-    .modal.hidden { display: none; }
-    .modal-content { background: #111; padding: 16px; border-radius: 8px; width: 320px; max-width: 90%; position: relative; }
-    .modal .close { position: absolute; right: 12px; top: 8px; background: transparent; border: none; color: #fff; cursor: pointer; }
-    .controls { display:flex; gap:8px; align-items:center; }
-    #logoutBtn { background: transparent; border: 1px solid rgba(255,255,255,0.06); color: inherit; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
-    #logoutBtn:hover { background: rgba(255,255,255,0.03); }
-    .file-label { display:inline-flex; align-items:center; gap:6px; cursor:pointer; position:relative; }
-    .file-label input[type="file"] { position:absolute; width:0.1px; height:0.1px; opacity:0; overflow:hidden; z-index:-1; }
-    .avatar-large { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; }
-
-    /* Composer icon-only layout */
-    .composer {
-      display: grid;
-      grid-template-columns: 140px 1fr repeat(5, 44px);
-      gap: 8px;
-      padding: 12px;
-      border-top: 1px solid rgba(255,255,255,0.02);
-      align-items: center;
-    }
-    .composer select, .composer input[type="text"] {
-      padding: 8px;
-      border-radius: 8px;
-      border: 0;
-      background: rgba(255,255,255,0.02);
-      color: inherit;
-    }
-    .composer input[type="text"] { padding: 10px; width:100%; }
-
-    /* Icon button */
-    .icon-btn {
-      width: 44px;
-      height: 44px;
-      border: none;
-      border-radius: 10px;
-      background: rgba(255,255,255,0.02);
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      transition: transform 120ms ease, background 120ms ease, opacity 120ms ease;
-    }
-    .icon-btn:hover:not(:disabled) { transform: translateY(-2px); background: rgba(255,255,255,0.04); }
-    .icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .icon { width:20px; height:20px; fill: #e6eef6; }
-
-    /* Recording state */
-    .icon-btn.recording { background: linear-gradient(90deg,#b91c1c,#ef4444); }
-    .icon-btn.recording .icon { fill: #fff; }
-
-    /* Messages area basic styles (ensure text visible) */
-    .messages { padding: 12px; overflow:auto; display:flex; flex-direction:column; gap:10px; min-height: 300px; }
-    .message { display:flex; gap:10px; align-items:flex-start; max-width:70%; }
-    .message .avatar { width:36px; height:36px; border-radius:50%; background:#0e1628; flex:0 0 36px; }
-    .message .content { background: rgba(255,255,255,0.03); color: #e6eef6; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.02); word-break:break-word; }
-    .message.me .content { background: linear-gradient(90deg,#0ea5a4,#0891b2); color:#042027; }
-    .msg-text { color: #e6eef6; font-size:14px; line-height:1.4; white-space:pre-wrap; margin:0 0 6px 0; }
-    .meta { font-size:11px; color: rgba(148,163,184,0.9); text-align:right; margin-top:6px; }
-
-    /* Uploaded media */
-    img.uploaded { max-width:240px; border-radius:8px; display:block; margin-top:8px; }
-    audio.uploaded { display:block; margin-top:8px; width:100%; max-width:240px; }
-
-    /* Responsive */
-    @media (max-width:900px) {
-      .composer { grid-template-columns: 1fr repeat(5, 44px); }
-      .app { padding:8px; }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ChatApp — ფუნქციონალური</title>
+<style>
+:root{
+  --bg-dark-1:#071024; --bg-dark-2:#071a2a;
+  --panel-dark:rgba(255,255,255,0.02);
+  --accent:#06b6d4; --muted:#94a3b8; --text-dark:#e6eef6;
+  --radius:12px;
+  --reaction-w:92px; --reaction-btn:56px; --reaction-font:28px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:Inter,system-ui,Arial;background:linear-gradient(180deg,var(--bg-dark-1),var(--bg-dark-2));color:var(--text-dark);-webkit-font-smoothing:antialiased}
+body.light{background:linear-gradient(180deg,#ffffff,#f7fafc);color:#0b1220}
+.app{display:grid;grid-template-columns:1fr 320px;height:100vh;padding:12px;gap:12px}
+.left-col{display:flex;flex-direction:column;border-radius:10px;background:var(--panel-dark);overflow:hidden;min-width:0}
+.header-left{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid rgba(255,255,255,0.03)}
+body.light .header-left{border-bottom-color:rgba(2,6,23,0.06)}
+.brand{font-weight:700;color:var(--accent)}
+.online-indicator{font-size:13px;color:var(--muted)}
+.messages{flex:1;padding:12px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.message{max-width:80%;padding:10px;border-radius:12px;word-break:break-word}
+.me{align-self:flex-end;background:linear-gradient(90deg,#0ea5a4,#0891b2);color:#042027}
+.other{align-self:flex-start;background:rgba(255,255,255,0.03);color:var(--muted)}
+body.light .other{background:rgba(2,6,23,0.04);color:#0b1220}
+.msg-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.msg-header img{width:28px;height:28px;border-radius:50%;object-fit:cover}
+.msg-author{font-weight:700;font-size:13px}
+.meta{font-size:11px;opacity:0.9;margin-top:6px;text-align:right}
+.composer{display:flex;gap:8px;padding:12px;border-top:1px solid rgba(255,255,255,0.02);align-items:center;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);position:sticky;bottom:0;left:0;right:0;backdrop-filter: blur(6px);z-index:1400}
+.left-group{display:flex;gap:8px;align-items:center}
+.input{flex:1;padding:12px;border-radius:10px;border:0;background:rgba(255,255,255,0.02);color:inherit;font-size:16px;height:48px}
+body.light .input{background:rgba(2,6,23,0.04);color:#0b1220}
+.icon-btn{width:44px;height:44px;border-radius:10px;border:0;background:rgba(255,255,255,0.03);display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
+body.light .icon-btn{background:rgba(2,6,23,0.03);color:#0b1220}
+.send-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;background:var(--accent);border:0;border-radius:10px;color:#042027;cursor:pointer;font-weight:700}
+.users-list{padding:12px;background:rgba(255,255,255,0.01);border-radius:8px;overflow:auto}
+.user-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:6px;cursor:pointer}
+.user-item img{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:8px}
+.small{font-size:13px;color:var(--muted)}
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:3000}
+.modal.hidden{display:none}
+.modal .box{background:#071a2a;padding:16px;border-radius:8px;color:var(--text-dark);width:420px;max-width:94%}
+body.light .modal .box{background:#fff;color:#0b1220}
+.close{position:absolute;right:12px;top:8px;background:transparent;border:0;color:var(--muted);cursor:pointer}
+.avatar-large{width:96px;height:96px;border-radius:50%;object-fit:cover}
+.reaction-toggle{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.reaction-picker{position:fixed;display:flex;flex-direction:column;gap:8px;padding:8px;background:linear-gradient(180deg,#0f1724,#071024);border-radius:12px;box-shadow:0 12px 36px rgba(2,6,23,0.6);z-index:2000;max-height:60vh;overflow:auto;width:var(--reaction-w)}
+.reaction-picker button{background:transparent;border:0;font-size:var(--reaction-font);width:var(--reaction-btn);height:var(--reaction-btn);cursor:pointer;border-radius:10px}
+.reactions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.react{background:rgba(255,255,255,0.02);border-radius:999px;padding:6px 10px;display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,0.03)}
+.btn-delete{background:transparent;border:1px solid rgba(255,255,255,0.04);color:#ffb4b4;padding:6px 8px;border-radius:6px;cursor:pointer}
+.record-btn{width:48px;height:48px;border-radius:12px;border:0;background:linear-gradient(180deg,#06b6d4,#0284a2);color:#042027;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.record-btn.recording{background:linear-gradient(180deg,#ff3b3b,#c40000)}
+@media(max-width:900px){.app{grid-template-columns:1fr}.users-list{display:none}}
+</style>
 </head>
 <body>
-  <div class="app">
-    <aside class="left-col">
-      <div class="header-left">
-        <div class="brand">ჩატი</div>
-        <div id="onlineIndicator" class="online-indicator">ონლაინ: <span id="onlineCount">0</span></div>
+<div class="app">
+  <div class="left-col" role="main" aria-label="ჩატი">
+    <div class="header-left">
+      <div>
+        <div class="brand">ChatApp</div>
+        <div id="statusText" class="online-indicator">გთხოვთ შეხვიდეთ ან დარეგისტრირდეთ</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="themeBtn" class="icon-btn" title="თემა" aria-label="თემა">🌙</button>
+        <button id="loginBtn" class="icon-btn" title="შესვლა" aria-label="შესვლა">🔐</button>
+        <button id="registerBtn" class="icon-btn" title="რეგისტრაცია" aria-label="რეგისტრაცია">✍️</button>
+        <button id="profileBtn" class="icon-btn" title="პროფილი" aria-label="პროფილი" style="display:none">👤</button>
+        <button id="logoutBtn" class="icon-btn" title="გასვლა" aria-label="გასვლა" style="display:none">⎋</button>
+      </div>
+    </div>
+
+    <div id="messages" class="messages" tabindex="0" aria-live="polite"></div>
+
+    <div class="composer" role="region" aria-label="შეტყობინების შემქმნელი">
+      <div class="left-group">
+        <label title="ატვირთვა">
+          <input id="fileInput" type="file" accept="image/*,audio/*" style="display:none" />
+          <button id="attachBtn" class="icon-btn" aria-label="ატვირთვა" title="ატვირთვა">
+            <!-- SVG paperclip / attach -->
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M21.44 11.05l-8.49 8.49a5 5 0 01-7.07 0 5 5 0 010-7.07l8.49-8.49a3.5 3.5 0 014.95 4.95l-8.49 8.49a1.5 1.5 0 01-2.12 0 1.5 1.5 0 010-2.12l7.07-7.07" stroke="#94a3b8" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </label>
+
+        <button id="emojiBtn" class="icon-btn" title="ემოჯი" aria-label="ემოჯი">😊</button>
+
+        <button id="recordBtn" class="record-btn" title="ჩაწერა" aria-pressed="false" aria-label="ჩაწერა">
+          <svg id="micSvg" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="3" width="4" height="8" rx="2" fill="#042027" opacity="0.12"></rect>
+            <path d="M12 14v4" stroke="#042027" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8 11a4 4 0 0 0 8 0" stroke="#042027" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M19 11v1a7 7 0 0 1-14 0v-1" stroke="#042027" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+          </svg>
+        </button>
       </div>
 
-      <main id="messages" class="messages"></main>
-
-      <!-- Composer: icon-only controls -->
-      <form id="msgForm" class="composer">
-        <select id="recipientSelect">
-          <option value="">საერთო</option>
-        </select>
-
-        <input id="msgInput" autocomplete="off" placeholder="ტექსტი..." />
-
-        <!-- Photo: hidden input + icon-only button -->
-        <input id="photoInput" type="file" accept="image/*" hidden />
-        <button type="button" id="btnPhoto" class="icon-btn" title="ფოტო" aria-label="Photo">
-          <svg viewBox="0 0 24 24" class="icon"><path d="M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2l1-2h8l1 2h2a2 2 0 0 1 2 2v12zM7 12l3-3 3 3 3-3 4 4v4H5v-4l2-2z"/></svg>
-        </button>
-
-        <!-- Voice: record / stop / send (icon-only) -->
-        <button type="button" id="recordBtn" class="icon-btn" title="ჩაწერა" aria-label="Record">
-          <svg viewBox="0 0 24 24" class="icon"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zM19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-2.08A7 7 0 0 0 19 11z"/></svg>
-        </button>
-        <button type="button" id="stopBtn" class="icon-btn" title="გაჩერება" aria-label="Stop" disabled>
-          <svg viewBox="0 0 24 24" class="icon"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
-        </button>
-        <button type="button" id="sendAudioBtn" class="icon-btn" title="ხმის გაგზავნა" aria-label="Send voice" disabled>
-          <svg viewBox="0 0 24 24" class="icon"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>
-        </button>
-
-        <!-- Send text: icon-only -->
-        <button type="submit" id="sendBtn" class="icon-btn" title="გაგზავნა" aria-label="Send">
-          <svg viewBox="0 0 24 24" class="icon"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>
-        </button>
-      </form>
-    </aside>
-
-    <aside class="right-col">
-      <div class="controls">
-        <button id="logoutBtn" class="send-btn">გასვლა</button>
-        <button id="openProfileBtn">პროფილი</button>
-      </div>
-      <div class="users-list" id="usersList"></div>
-    </aside>
-  </div>
-
-  <!-- login modal -->
-  <div id="loginModal" class="modal">
-    <div class="modal-content">
-      <button id="closeLogin" class="close">X</button>
-      <h3>შესვლა</h3>
-      <form id="loginForm">
-        <input id="login_username" placeholder="ნიკნეიმი" required />
-        <input id="login_password" placeholder="პაროლი" type="password" required />
-        <div style="margin-top:8px;display:flex;gap:8px">
-          <button type="submit" class="send-btn">შესვლა</button>
-          <button type="button" id="openRegisterBtn" class="send-btn">რეგისტრაცია</button>
-        </div>
-      </form>
+      <input id="composerInput" class="input" type="text" placeholder="დაწერეთ შეტყობინება..." aria-label="შეტყობინების ტექსტი" />
+      <button id="sendBtn" class="send-btn" aria-label="გაგზავნა">გაგზავნა</button>
     </div>
   </div>
 
-  <!-- registration modal -->
-  <div id="registerModal" class="modal hidden">
-    <div class="modal-content">
-      <button id="closeRegister" class="close">X</button>
-      <h3>რეგისტრაცია</h3>
-      <form id="registerForm">
-        <input id="reg_first" placeholder="სახელი" />
-        <input id="reg_last" placeholder="გვარი" />
-        <input id="reg_nick" placeholder="ნიკნეიმი (უნიკალური)" required />
-        <input id="reg_email" placeholder="მეილი (არასავალდებულო)" type="email" />
-        <input id="reg_age" placeholder="ასაკი" type="number" min="1" />
-        <input id="reg_password" placeholder="პაროლი" type="password" required />
-        <label>ავატარი <input id="reg_avatar" type="file" accept="image/*" /></label>
-        <div style="margin-top:8px;display:flex;gap:8px">
-          <button type="submit" class="send-btn">რეგისტრაცია</button>
-          <button type="button" id="openLoginBtn" class="send-btn">უკან შესვლა</button>
-        </div>
-      </form>
+  <aside class="users-list" aria-label="მომხმარებლები">
+    <div style="display:flex;gap:8px;align-items:center;padding:12px">
+      <input id="searchUsers" placeholder="ძიება" style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.01)" />
+      <button id="openRegisterBtn" class="icon-btn" title="რეგისტრაცია">✍️</button>
+    </div>
+    <div id="usersList" style="padding:12px"></div>
+  </aside>
+</div>
+
+<!-- Modals -->
+<div id="loginModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="box">
+    <button class="close" id="closeLogin">✕</button>
+    <h3>შესვლა</h3>
+    <div class="small">ნიკ ნეიმი</div>
+    <input id="loginNick" style="width:100%;padding:8px;margin:6px 0" />
+    <div class="small">პაროლი</div>
+    <input id="loginPass" type="password" style="width:100%;padding:8px;margin:6px 0" />
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button id="loginSubmit" class="send-btn">შესვლა</button>
+      <button id="loginCancel" class="icon-btn">✕</button>
     </div>
   </div>
+</div>
 
-  <!-- profile modal -->
-  <div id="profileModal" class="modal hidden">
-    <div class="modal-content">
-      <button id="closeProfile" class="close">X</button>
-      <h3 id="profileName">პროფილი</h3>
-      <img id="profileAvatar" src="" alt="avatar" class="avatar-large" />
-      <div id="profileInfo"></div>
-      <div style="margin-top:8px">
-        <button id="sendPmBtn" class="send-btn">შეტყობინების გაგზავნა</button>
-        <button id="viewPhotosBtn" class="send-btn">ფოტოების ნახვა</button>
-        <button id="voiceCallBtn" class="send-btn">ხმოვანი ზარი</button>
-        <button id="videoCallBtn" class="send-btn">ვიდეო ზარი</button>
+<div id="registerModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="box">
+    <button class="close" id="closeRegister">✕</button>
+    <h3>რეგისტრაცია</h3>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <input id="regFirst" placeholder="სახელი" style="padding:8px" />
+      <input id="regLast" placeholder="გვარი" style="padding:8px" />
+      <div style="display:flex;gap:8px">
+        <input id="regYear" placeholder="დაბ. წელი" type="number" style="flex:1;padding:8px" />
+        <input id="regNick" placeholder="ნიკ ნეიმი" style="flex:1;padding:8px" />
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="regPass" placeholder="პაროლი" type="password" style="flex:1;padding:8px" />
+        <input id="regPassConfirm" placeholder="გაიმეორეთ" type="password" style="flex:1;padding:8px" />
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="regAvatarInput" type="file" accept="image/*" style="display:none" />
+        <button id="regAvatarBtn" class="icon-btn">📷</button>
+        <div id="regAvatarPreview" class="small">ავატარი (არასავალდებულო)</div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="regSubmit" class="send-btn">რეგისტრაცია</button>
+        <button id="regCancel" class="icon-btn">✕</button>
       </div>
     </div>
   </div>
+</div>
 
-  <audio id="audioPreview" controls style="display:none"></audio>
+<div id="profileModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="box">
+    <button class="close" id="closeProfile">✕</button>
+    <h3>პროფილი</h3>
+    <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+      <img id="profileAvatar" class="avatar-large" src="https://picsum.photos/96" alt="ავატარი" />
+      <div>
+        <div id="profileFullName" style="font-weight:700">სახელი გვარი</div>
+        <div id="profileNickname" class="small">@ნიკნეიმი</div>
+      </div>
+    </div>
+    <div style="margin-top:12px" class="small">დაბ. წელი: <span id="profileYear">----</span></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <input id="avatarUploadInput" type="file" accept="image/*" style="display:none" />
+      <button id="changeAvatarBtn" class="send-btn">ავატარის შეცვლა</button>
+      <button id="closeProfileBtn" class="icon-btn">✕</button>
+    </div>
+  </div>
+</div>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="/client.js"></script>
+<div id="viewProfileModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="box">
+    <button class="close" id="closeViewProfile">✕</button>
+    <h3>მომხმარებლის პროფილი</h3>
+    <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+      <img id="viewAvatar" class="avatar-large" src="https://picsum.photos/96" alt="ავატარი" />
+      <div>
+        <div id="viewFullName" style="font-weight:700">სახელი გვარი</div>
+        <div id="viewNickname" class="small">@ნიკნეიმი</div>
+      </div>
+    </div>
+    <div style="margin-top:12px" class="small">დაბ. წელი: <span id="viewYear">----</span></div>
+  </div>
+</div>
 
-  <script>
-    // Minimal inline wiring to connect the new icon-only controls.
-    // This augments your existing client.js behavior without replacing it.
+<!-- Reaction picker -->
+<div id="reactionPicker" class="reaction-picker" style="display:none">
+  <button data-emoji="😀">😀</button>
+  <button data-emoji="😁">😁</button>
+  <button data-emoji="😂">😂</button>
+  <button data-emoji="🤣">🤣</button>
+  <button data-emoji="😅">😅</button>
+  <button data-emoji="😊">😊</button>
+  <button data-emoji="😍">😍</button>
+  <button data-emoji="😇">😇</button>
+  <button data-emoji="😆">😆</button>
+  <button data-emoji="🙃">🙃</button>
+  <button data-emoji="🤔">🤔</button>
+  <button data-emoji="🤗">🤗</button>
+  <button data-emoji="🙄">🙄</button>
+  <button data-emoji="👍">👍</button>
+  <button data-emoji="❤️">❤️</button>
+</div>
 
-    const socket = io();
+<script>
+/* სრული JS: რეგისტრაცია/შესვლა, მესიჯები, ფაილი, ჩაწერა, რეაქციები, პროფილი */
+(async function(){
+  // Elements
+  const messagesEl = document.getElementById('messages');
+  const usersListEl = document.getElementById('usersList');
+  const composerInput = document.getElementById('composerInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const attachBtn = document.getElementById('attachBtn');
+  const fileInput = document.getElementById('fileInput');
+  const recordBtn = document.getElementById('recordBtn');
+  const reactionPicker = document.getElementById('reactionPicker');
+  const emojiBtn = document.getElementById('emojiBtn');
 
-    const messagesEl = document.getElementById('messages');
-    const recipientSelect = document.getElementById('recipientSelect');
-    const msgForm = document.getElementById('msgForm');
-    const msgInput = document.getElementById('msgInput');
+  const loginBtn = document.getElementById('loginBtn');
+  const registerBtn = document.getElementById('registerBtn');
+  const profileBtn = document.getElementById('profileBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const statusText = document.getElementById('statusText');
+  const themeBtn = document.getElementById('themeBtn');
+  const openRegisterBtn = document.getElementById('openRegisterBtn');
 
-    const photoInput = document.getElementById('photoInput');
-    const btnPhoto = document.getElementById('btnPhoto');
+  // Modals & inputs
+  const loginModal = document.getElementById('loginModal');
+  const loginSubmit = document.getElementById('loginSubmit');
+  const loginCancel = document.getElementById('loginCancel');
+  const loginNick = document.getElementById('loginNick');
+  const loginPass = document.getElementById('loginPass');
+  const closeLogin = document.getElementById('closeLogin');
 
-    const recordBtn = document.getElementById('recordBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const sendAudioBtn = document.getElementById('sendAudioBtn');
-    const audioPreview = document.getElementById('audioPreview');
+  const registerModal = document.getElementById('registerModal');
+  const regSubmit = document.getElementById('regSubmit');
+  const regCancel = document.getElementById('regCancel');
+  const regFirst = document.getElementById('regFirst');
+  const regLast = document.getElementById('regLast');
+  const regYear = document.getElementById('regYear');
+  const regNick = document.getElementById('regNick');
+  const regPass = document.getElementById('regPass');
+  const regPassConfirm = document.getElementById('regPassConfirm');
+  const regAvatarBtn = document.getElementById('regAvatarBtn');
+  const regAvatarInput = document.getElementById('regAvatarInput');
+  const regAvatarPreview = document.getElementById('regAvatarPreview');
+  const closeRegister = document.getElementById('closeRegister');
 
-    // Helper to render messages (robust)
-    function addMessage(msg) {
-      const text = (msg && (msg.text || msg.message || msg.body || '')) || '';
-      const mediaType = msg && (msg.media_type || (msg.media && msg.media.type) || msg.type) || null;
-      const mediaUrl = msg && (msg.media_url || (msg.media && msg.media.url) || msg.url) || null;
-      const username = (msg && (msg.username || msg.user || msg.from_name)) || 'Guest';
-      const ts = msg && (msg.ts || msg.time || Date.now());
+  const profileModal = document.getElementById('profileModal');
+  const closeProfile = document.getElementById('closeProfile');
+  const closeProfileBtn = document.getElementById('closeProfileBtn');
+  const profileAvatar = document.getElementById('profileAvatar');
+  const profileFullName = document.getElementById('profileFullName');
+  const profileNickname = document.getElementById('profileNickname');
+  const profileYear = document.getElementById('profileYear');
+  const changeAvatarBtn = document.getElementById('changeAvatarBtn');
+  const avatarUploadInput = document.getElementById('avatarUploadInput');
+  const editProfileBtn = document.getElementById('editProfileBtn');
 
-      const wrapper = document.createElement('div');
-      wrapper.className = 'message';
-      if (msg && (msg.mine || (window.currentUserId && msg.from_user === window.currentUserId))) wrapper.classList.add('me');
-      else wrapper.classList.add('other');
+  const viewProfileModal = document.getElementById('viewProfileModal');
+  const closeViewProfile = document.getElementById('closeViewProfile');
+  const viewAvatar = document.getElementById('viewAvatar');
+  const viewFullName = document.getElementById('viewFullName');
+  const viewNickname = document.getElementById('viewNickname');
+  const viewYear = document.getElementById('viewYear');
 
-      const avatarDiv = document.createElement('div');
-      avatarDiv.className = 'avatar';
-      if (msg && msg.avatar) {
-        const img = document.createElement('img');
-        img.src = msg.avatar;
-        img.style.width = '36px';
-        img.style.height = '36px';
-        img.style.borderRadius = '50%';
-        avatarDiv.appendChild(img);
-      }
+  // Storage keys
+  const LS_USERS = 'chatapp_users_v2';
+  const LS_CURRENT = 'chatapp_current_v2';
+  const LS_MESSAGES = 'chatapp_messages_v2';
+  const LS_THEME = 'chatapp_theme_v2';
 
-      const content = document.createElement('div');
-      content.className = 'content';
+  // State
+  let users = load(LS_USERS) || [];
+  let currentUser = load(LS_CURRENT) || null;
+  let messages = load(LS_MESSAGES) || [];
 
-      if (text !== '') {
-        const p = document.createElement('div');
-        p.className = 'msg-text';
-        p.textContent = text;
-        content.appendChild(p);
-      }
+  let pendingFile = null;
+  let pendingPreviewEl = null;
 
-      if (mediaType === 'image' && mediaUrl) {
-        const im = document.createElement('img');
-        im.className = 'uploaded';
-        im.src = mediaUrl;
-        content.appendChild(im);
-      }
+  // Recorder
+  let mediaRecorder = null;
+  let mediaStream = null;
+  let chunks = [];
+  let isRecording = false;
 
-      if (mediaType === 'audio' && mediaUrl) {
-        const a = document.createElement('audio');
-        a.className = 'uploaded';
-        a.controls = true;
-        a.src = mediaUrl;
-        content.appendChild(a);
-      }
+  // Helpers
+  function save(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
+  function load(key){ try { return JSON.parse(localStorage.getItem(key)); } catch(e){ return null; } }
+  function uid(prefix='id'){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+  function timeNow(){ const d=new Date(); return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = `${username} • ${new Date(ts).toLocaleTimeString()}`;
-      content.appendChild(meta);
+  async function sha256Hex(str){
+    const enc = new TextEncoder();
+    const data = enc.encode(str);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
 
-      wrapper.appendChild(avatarDiv);
-      wrapper.appendChild(content);
-      messagesEl.appendChild(wrapper);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+  // Init demo
+  function initDemo(){
+    if(!users || users.length === 0){
+      users = [
+        { id: 'u_demo1', first:'ანა', last:'მცირიშვილი', year:'1992', nick:'ana92', avatar:'https://picsum.photos/seed/ana/96', passHash:null },
+        { id: 'u_demo2', first:'გიორგი', last:'კაპანაძე', year:'1988', nick:'giorgi88', avatar:'https://picsum.photos/seed/giorgi/96', passHash:null }
+      ];
+      save(LS_USERS, users);
     }
+    if(!messages || messages.length === 0){
+      messages = [
+        { id: uid('m'), text:'გამარჯობა! ეს არის დემო მესიჯი.', userId: users[0].id, time: timeNow(), reactions:[], reactionCount:0 },
+        { id: uid('m'), text:'კარგად, მადლობა!', userId: users[1].id, time: timeNow(), reactions:[], reactionCount:0 }
+      ];
+      save(LS_MESSAGES, messages);
+    }
+  }
 
-    // Socket listeners (basic)
-    socket.on('message', m => addMessage(m));
-    socket.on('privateMessage', m => addMessage(m));
-    socket.on('users', users => {
-      // populate recipientSelect (simple)
-      recipientSelect.innerHTML = '<option value="">საერთო</option>';
-      users.forEach(u => {
-        const opt = document.createElement('option');
-        opt.value = u.username;
-        opt.textContent = u.username;
-        recipientSelect.appendChild(opt);
-      });
-    });
-    socket.on('onlineCount', ({ count, users }) => {
-      const el = document.getElementById('onlineCount');
-      if (el) el.textContent = (users && users.length) ? users.length : (count || 0);
-    });
+  // Theme
+  function applyTheme(t){ if(t==='light') document.body.classList.add('light'); else document.body.classList.remove('light'); save(LS_THEME, t); }
+  applyTheme(load(LS_THEME) || 'dark');
+  themeBtn.addEventListener('click', ()=> applyTheme(document.body.classList.contains('light') ? 'dark' : 'light'));
 
-    // Send text (submit)
-    msgForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const text = msgInput.value.trim();
-      const to = recipientSelect.value || null;
-      if (!text) return;
-      if (!to) socket.emit('chatMessage', { text, media: null });
-      else socket.emit('privateMessage', { toUsername: to, text, media: null });
-      msgInput.value = '';
-    });
+  // UI updates
+  function updateAuthUI(){
+    if(currentUser){
+      loginBtn.style.display='none'; registerBtn.style.display='none'; profileBtn.style.display='inline-flex'; logoutBtn.style.display='inline-flex';
+      statusText.textContent = `მომხმარებელი: @${currentUser.nick}`;
+    } else {
+      loginBtn.style.display='inline-flex'; registerBtn.style.display='inline-flex'; profileBtn.style.display='none'; logoutBtn.style.display='none';
+      statusText.textContent = 'გთხოვთ შეხვიდეთ ან დარეგისტრირდეთ';
+    }
+  }
 
-    // Photo: open file dialog and upload
-    if (btnPhoto && photoInput) {
-      btnPhoto.addEventListener('click', () => photoInput.click());
-      photoInput.addEventListener('change', async () => {
-        const file = photoInput.files?.[0];
-        if (!file) return;
-        const form = new FormData();
-        form.append('photo', file);
-        try {
-          const res = await fetch('/api/upload/photo', { method: 'POST', body: form });
-          const data = await res.json();
-          if (!data.ok) { alert(data.error || 'Photo upload failed'); return; }
-          const to = recipientSelect.value || null;
-          if (!to) socket.emit('chatMessage', { text: '', media: { type: 'image', url: data.url } });
-          else socket.emit('privateMessage', { toUsername: to, text: '', media: { type: 'image', url: data.url } });
-        } catch (err) {
-          console.error(err);
-          alert('ფოტოს ატვირთვა ვერ მოხერხდა');
-        } finally {
-          photoInput.value = '';
+  // Render users
+  function renderUsers(){
+    usersListEl.innerHTML = '';
+    users.forEach(u=>{
+      const el = document.createElement('div');
+      el.className = 'user-item';
+      el.innerHTML = `<div style="display:flex;align-items:center"><img src="${u.avatar||'https://picsum.photos/36'}" alt="" /><div style="margin-left:8px"><strong>${escapeHtml(u.first)} ${escapeHtml(u.last)}</strong><div class="small">@${escapeHtml(u.nick)}</div></div></div><div>${currentUser && currentUser.id===u.id ? '<span class="small">მე</span>' : '<button class="icon-btn view-btn" data-id="'+u.id+'">👁️</button>'}</div>`;
+      usersListEl.appendChild(el);
+    });
+  }
+
+  // Render messages
+  function renderMessages(){
+    messagesEl.innerHTML = '';
+    messages.forEach(m=>{
+      const author = users.find(u=>u.id===m.userId) || {nick:'unknown', first:'', last:'', avatar:'https://picsum.photos/36'};
+      const el = document.createElement('div');
+      el.className = 'message ' + (currentUser && currentUser.id===m.userId ? 'me' : 'other');
+      el.dataset.id = m.id;
+      el.innerHTML = `<div class="msg-header"><img src="${author.avatar||'https://picsum.photos/36'}" alt="" /><div><div class="msg-author">${escapeHtml(author.nick)}</div><div class="small">${escapeHtml(author.first)} ${escapeHtml(author.last)}</div></div></div><div>${escapeHtml(m.text||'')}</div>`;
+      if(m.file){
+        if(m.file.type && m.file.type.startsWith('image/')){
+          const img = document.createElement('img'); img.src = m.file.data; img.className='uploaded'; img.style.maxWidth='220px'; img.style.marginTop='8px'; el.appendChild(img);
+        } else if(m.file.type && m.file.type.startsWith('audio/')){
+          const audio = document.createElement('audio'); audio.controls=true; audio.src = m.file.data; audio.style.marginTop='8px'; el.appendChild(audio);
+        } else {
+          const link = document.createElement('div'); link.textContent = m.file.name || 'ფაილი'; link.style.marginTop='8px'; link.className='small'; el.appendChild(link);
         }
+      }
+      const actions = document.createElement('div'); actions.className='msg-actions';
+      const toggle = document.createElement('button'); toggle.className='reaction-toggle'; toggle.textContent='🙂';
+      const badge = document.createElement('span'); badge.className='small'; badge.style.marginLeft='6px'; badge.textContent = m.reactionCount || 0;
+      toggle.appendChild(badge);
+      actions.appendChild(toggle);
+      const reactionsWrap = document.createElement('div'); reactionsWrap.className='reactions';
+      (m.reactions||[]).forEach(r=>{
+        const rb = document.createElement('div'); rb.className='react'; rb.innerHTML = `${escapeHtml(r.emoji)} <span class="small">${r.count}</span>`; reactionsWrap.appendChild(rb);
       });
-    }
-
-    // Voice recording (MediaRecorder)
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let audioBlob = null;
-
-    async function startRecording() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) audioChunks.push(e.data); };
-        mediaRecorder.onstop = () => {
-          audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          audioPreview.src = URL.createObjectURL(audioBlob);
-          audioPreview.style.display = 'block';
-          sendAudioBtn.disabled = false;
-        };
-        mediaRecorder.start();
-        recordBtn.classList.add('recording');
-        stopBtn.disabled = false;
-        sendAudioBtn.disabled = true;
-      } catch (err) {
-        console.error(err);
-        alert('მიკროფონზე წვდომა ვერ მოხერხდა');
+      actions.appendChild(reactionsWrap);
+      if(currentUser && currentUser.id===m.userId){
+        const del = document.createElement('button'); del.className='btn-delete'; del.textContent='წაშლა';
+        del.addEventListener('click', ()=>{ if(confirm('ნამდვილად წაშლა?')){ messages = messages.filter(x=>x.id!==m.id); save(LS_MESSAGES, messages); renderMessages(); }});
+        actions.appendChild(del);
       }
-    }
-
-    function stopRecording() {
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-        mediaRecorder.stream.getTracks().forEach(t => t.stop());
-      }
-      recordBtn.classList.remove('recording');
-      stopBtn.disabled = true;
-    }
-
-    async function sendRecordedAudio() {
-      if (!audioBlob) return;
-      const form = new FormData();
-      form.append('audio', audioBlob, `voice-${Date.now()}.webm`);
-      try {
-        const res = await fetch('/api/upload/audio', { method: 'POST', body: form });
-        const data = await res.json();
-        if (!data.ok) { alert(data.error || 'Audio upload failed'); return; }
-        const to = recipientSelect.value || null;
-        if (!to) socket.emit('chatMessage', { text: '', media: { type: 'audio', url: data.url } });
-        else socket.emit('privateMessage', { toUsername: to, text: '', media: { type: 'audio', url: data.url } });
-
-        audioPreview.style.display = 'none';
-        audioPreview.src = '';
-        audioBlob = null;
-        sendAudioBtn.disabled = true;
-      } catch (err) {
-        console.error(err);
-        alert('ხმის ატვირთვა ვერ მოხერხდა');
-      }
-    }
-
-    recordBtn.addEventListener('click', () => {
-      if (!mediaRecorder || mediaRecorder.state === 'inactive') startRecording();
+      el.appendChild(actions);
+      messagesEl.appendChild(el);
     });
-    stopBtn.addEventListener('click', stopRecording);
-    sendAudioBtn.addEventListener('click', sendRecordedAudio);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
 
-    // Small UX: Enter to send text
-    msgInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        msgForm.requestSubmit();
-      }
-    });
+  // Open/close modal helpers
+  function openModal(el){ el.classList.remove('hidden'); const c = el.querySelector('.box'); if(c) c.focus(); }
+  function closeModal(el){ el.classList.add('hidden'); }
 
-    // Basic auth modal wiring (kept minimal)
-    const loginModal = document.getElementById('loginModal');
-    const registerModal = document.getElementById('registerModal');
-    const openRegisterBtn = document.getElementById('openRegisterBtn');
-    const openLoginBtn = document.getElementById('openLoginBtn');
-    const closeLogin = document.getElementById('closeLogin');
-    const closeRegister = document.getElementById('closeRegister');
+  // Register handlers
+  regAvatarBtn.addEventListener('click', ()=> regAvatarInput.click());
+  regAvatarInput.addEventListener('change', (e)=> {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const r = new FileReader(); r.onload = ()=> { regAvatarPreview.textContent = f.name; regAvatarPreview.style.backgroundImage = `url(${r.result})`; regAvatarPreview.style.backgroundSize='cover'; regAvatarPreview.style.padding='8px'; regAvatarPreview.style.borderRadius='8px'; };
+    r.readAsDataURL(f);
+  });
 
-    function showLogin(){ if(loginModal) loginModal.classList.remove('hidden'); if(registerModal) registerModal.classList.add('hidden'); }
-    function showRegister(){ if(registerModal) registerModal.classList.remove('hidden'); if(loginModal) loginModal.classList.add('hidden'); }
+  regSubmit.addEventListener('click', async ()=>{
+    const first = regFirst.value.trim(), last = regLast.value.trim(), year = regYear.value.trim(), nick = regNick.value.trim();
+    const pass = regPass.value, passC = regPassConfirm.value;
+    if(!first||!last||!year||!nick||!pass||!passC){ alert('გთხოვთ შეავსოთ ყველა ველი'); return; }
+    if(pass !== passC){ alert('პაროლები არ ემთხვევა'); return; }
+    if(pass.length < 6){ alert('პაროლი უნდა იყოს მინიმუმ 6 სიმბოლო'); return; }
+    if(users.some(u=>u.nick.toLowerCase()===nick.toLowerCase())){ alert('ნიკი დაკავებულია'); return; }
+    const passHash = await sha256Hex(pass);
+    const newUser = { id: uid('u'), first, last, year, nick, avatar:null, passHash };
+    const f = regAvatarInput.files && regAvatarInput.files[0];
+    if(f){
+      const r = new FileReader(); r.onload = ()=> { newUser.avatar = r.result; users.push(newUser); save(LS_USERS, users); currentUser = newUser; save(LS_CURRENT, currentUser); closeModal(registerModal); updateAuthUI(); renderUsers(); renderMessages(); };
+      r.readAsDataURL(f);
+    } else {
+      users.push(newUser); save(LS_USERS, users); currentUser = newUser; save(LS_CURRENT, currentUser); closeModal(registerModal); updateAuthUI(); renderUsers(); renderMessages();
+    }
+  });
+  regCancel.addEventListener('click', ()=> closeModal(registerModal));
+  closeRegister.addEventListener('click', ()=> closeModal(registerModal));
 
-    if(openRegisterBtn) openRegisterBtn.addEventListener('click', showRegister);
-    if(openLoginBtn) openLoginBtn.addEventListener('click', showLogin);
-    if(closeLogin) closeLogin.addEventListener('click', ()=> loginModal.classList.add('hidden'));
-    if(closeRegister) closeRegister.addEventListener('click', ()=> registerModal.classList.add('hidden'));
-    document.addEventListener('keydown', (e)=> { if(e.key==='Escape'){ if(loginModal) loginModal.classList.add('hidden'); if(registerModal) registerModal.classList.add('hidden'); }});
-    [loginModal, registerModal].forEach(modal => { if(!modal) return; modal.addEventListener('click', (e)=> { if(e.target===modal) modal.classList.add('hidden'); }); });
+  // Login handlers
+  loginSubmit.addEventListener('click', async ()=>{
+    const nick = loginNick.value.trim(), pass = loginPass.value;
+    if(!nick||!pass){ alert('შეიყვანეთ ნიკი და პაროლი'); return; }
+    const user = users.find(u=>u.nick.toLowerCase()===nick.toLowerCase());
+    if(!user){ alert('მომხმარებელი ვერ მოიძებნა'); return; }
+    if(!user.passHash){ alert('ამ მომხმარებელს პაროლი არ აქვს'); return; }
+    const h = await sha256Hex(pass);
+    if(h !== user.passHash){ alert('პაროლი არასწორია'); return; }
+    currentUser = user; save(LS_CURRENT, currentUser); closeModal(loginModal); updateAuthUI(); renderUsers(); renderMessages();
+  });
+  loginCancel.addEventListener('click', ()=> closeModal(loginModal));
+  closeLogin.addEventListener('click', ()=> closeModal(loginModal));
 
-    // Expose currentUserId if /api/me returns it (used to mark own messages)
-    (async function setCurrentUserId(){
-      try {
-        const res = await fetch('/api/me', { credentials: 'include' });
-        const data = await res.json();
-        if (data.user) window.currentUserId = data.user.id;
-      } catch {}
-    })();
-  </script>
+  // Header buttons
+  loginBtn.addEventListener('click', ()=> openModal(loginModal));
+  registerBtn.addEventListener('click', ()=> openModal(registerModal));
+  openRegisterBtn.addEventListener('click', ()=> openModal(registerModal));
+  logoutBtn.addEventListener('click', ()=> { if(confirm('ნამდვილად გასვლა?')){ currentUser=null; save(LS_CURRENT, null); updateAuthUI(); renderUsers(); renderMessages(); }});
+  profileBtn.addEventListener('click', ()=> { if(!currentUser){ alert('გთხოვთ შეხვიდეთ'); return; } showProfile(); openModal(profileModal); });
+
+  closeProfile.addEventListener('click', ()=> closeModal(profileModal));
+  closeProfileBtn.addEventListener('click', ()=> closeModal(profileModal));
+  changeAvatarBtn.addEventListener('click', ()=> avatarUploadInput.click());
+  avatarUploadInput.addEventListener('change', (e)=> {
+    const f = e.target.files && e.target.files[0]; if(!f || !currentUser) return;
+    const r = new FileReader(); r.onload = ()=> { currentUser.avatar = r.result; const idx = users.findIndex(u=>u.id===currentUser.id); if(idx>=0) users[idx].avatar = currentUser.avatar; save(LS_USERS, users); save(LS_CURRENT, currentUser); showProfile(); renderUsers(); renderMessages(); };
+    r.readAsDataURL(f);
+  });
+
+  function showProfile(){ if(!currentUser) return; profileAvatar.src = currentUser.avatar || 'https://picsum.photos/96'; profileFullName.textContent = `${currentUser.first} ${currentUser.last}`; profileNickname.textContent = `@${currentUser.nick}`; profileYear.textContent = currentUser.year || '----'; }
+
+  // View other profile
+  usersListEl.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.view-btn');
+    if(!btn) return;
+    const id = btn.dataset.id;
+    const u = users.find(x=>x.id===id);
+    if(!u) return;
+    viewAvatar.src = u.avatar || 'https://picsum.photos/96';
+    viewFullName.textContent = `${u.first} ${u.last}`;
+    viewNickname.textContent = `@${u.nick}`;
+    viewYear.textContent = u.year || '----';
+    openModal(viewProfileModal);
+  });
+  closeViewProfile.addEventListener('click', ()=> closeModal(viewProfileModal));
+
+  // Attach file preview
+  attachBtn.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', (e)=>{
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    pendingFile = f;
+    if(pendingPreviewEl && pendingPreviewEl.parentNode) pendingPreviewEl.parentNode.removeChild(pendingPreviewEl);
+    const preview = document.createElement('div'); preview.style.display='flex'; preview.style.alignItems='center'; preview.style.gap='8px'; preview.style.marginLeft='8px'; preview.style.padding='6px'; preview.style.borderRadius='8px'; preview.style.background='rgba(255,255,255,0.02)';
+    const name = document.createElement('div'); name.className='small'; name.textContent = f.name; preview.appendChild(name);
+    if(f.type.startsWith('image/')){ const r=new FileReader(); const img=document.createElement('img'); img.style.width='56px'; img.style.height='56px'; img.style.objectFit='cover'; img.style.borderRadius='8px'; preview.insertBefore(img,name); r.onload=()=>img.src=r.result; r.readAsDataURL(f); }
+    else if(f.type.startsWith('audio/')){ const ic=document.createElement('div'); ic.textContent='🔊'; ic.style.fontSize='22px'; preview.insertBefore(ic,name); }
+    else { const ic=document.createElement('div'); ic.textContent='📄'; ic.style.fontSize='22px'; preview.insertBefore(ic,name); }
+    const rem = document.createElement('button'); rem.className='icon-btn'; rem.style.width='36px'; rem.style.height='36px'; rem.textContent='✕'; rem.addEventListener('click', ()=>{ pendingFile=null; fileInput.value=''; if(preview.parentNode) preview.parentNode.removeChild(preview); pendingPreviewEl=null; });
+    preview.appendChild(rem);
+    document.querySelector('.composer').insertBefore(preview, sendBtn);
+    pendingPreviewEl = preview;
+  });
+
+  // Send message
+  function createMessage({text,file,userId}){
+    const id = uid('m'); const time = timeNow();
+    const msg = { id, text, userId, time, reactions:[], reactionCount:0 };
+    if(file) msg.file = { name: file.name, type: file.type, data: file.data };
+    return msg;
+  }
+
+  async function sendMessage(){
+    if(!currentUser){ alert('გთხოვთ შეხვიდეთ ან დარეგისტრირდეთ'); return; }
+    const text = composerInput.value.trim();
+    if(!text && !pendingFile) return;
+    if(pendingFile && pendingFile instanceof File){
+      const r = new FileReader(); r.onload = ()=> {
+        const fileObj = { name: pendingFile.name, type: pendingFile.type, data: r.result };
+        const msg = createMessage({ text: text||'', file: fileObj, userId: currentUser.id });
+        messages.push(msg); save(LS_MESSAGES, messages); composerInput.value=''; pendingFile=null; if(pendingPreviewEl) pendingPreviewEl.remove(); pendingPreviewEl=null; renderMessages();
+      }; r.readAsDataURL(pendingFile);
+    } else if(pendingFile && pendingFile.data){
+      const msg = createMessage({ text: text||'', file: pendingFile, userId: currentUser.id });
+      messages.push(msg); save(LS_MESSAGES, messages); composerInput.value=''; pendingFile=null; if(pendingPreviewEl) pendingPreviewEl.remove(); pendingPreviewEl=null; renderMessages();
+    } else {
+      const msg = createMessage({ text: text||'', file:null, userId: currentUser.id });
+      messages.push(msg); save(LS_MESSAGES, messages); composerInput.value=''; renderMessages();
+    }
+  }
+  sendBtn.addEventListener('click', sendMessage);
+  composerInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
+
+  // Recording
+  recordBtn.addEventListener('click', async ()=>{
+    if(isRecording){ if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop(); return; }
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+      mediaRecorder = new MediaRecorder(mediaStream);
+      chunks = [];
+      mediaRecorder.ondataavailable = (ev)=>{ if(ev.data && ev.data.size) chunks.push(ev.data); };
+      mediaRecorder.onstop = ()=>{
+        try {
+          const blob = new Blob(chunks, { type:'audio/webm' });
+          const f = new File([blob], 'voice-'+Date.now()+'.webm', { type: blob.type });
+          const r = new FileReader();
+          r.onload = ()=>{
+            pendingFile = { name: f.name, type: f.type, data: r.result };
+            if(pendingPreviewEl && pendingPreviewEl.parentNode) pendingPreviewEl.parentNode.removeChild(pendingPreviewEl);
+            const preview = document.createElement('div'); preview.style.display='flex'; preview.style.alignItems='center'; preview.style.gap='8px'; preview.style.marginLeft='8px'; preview.style.padding='6px'; preview.style.borderRadius='8px'; preview.style.background='rgba(255,255,255,0.02)';
+            const icon = document.createElement('div'); icon.textContent='🔊'; icon.style.fontSize='22px'; preview.appendChild(icon);
+            const name = document.createElement('div'); name.className='small'; name.textContent = f.name; preview.appendChild(name);
+            const rem = document.createElement('button'); rem.className='icon-btn'; rem.style.width='36px'; rem.style.height='36px'; rem.textContent='✕'; rem.addEventListener('click', ()=>{ pendingFile=null; fileInput.value=''; if(preview.parentNode) preview.parentNode.removeChild(preview); pendingPreviewEl=null; });
+            preview.appendChild(rem);
+            document.querySelector('.composer').insertBefore(preview, sendBtn);
+            pendingPreviewEl = preview;
+          };
+          r.readAsDataURL(blob);
+          try { if(mediaStream && mediaStream.getTracks) mediaStream.getTracks().forEach(t=>t.stop()); } catch(e){}
+        } catch(err){ console.error('record stop error', err); alert('ჩაწერის დამთავრება ვერ მოხერხდა'); }
+        isRecording=false; recordBtn.classList.remove('recording'); recordBtn.setAttribute('aria-pressed','false'); recordBtn.innerHTML = '<svg id="micSvg" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="3" width="4" height="8" rx="2" fill="#042027" opacity="0.12"></rect><path d="M12 14v4" stroke="#042027" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 11a4 4 0 0 0 8 0" stroke="#042027" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      };
+      mediaRecorder.start();
+      isRecording=true; recordBtn.classList.add('recording'); recordBtn.setAttribute('aria-pressed','true'); recordBtn.innerHTML='⏹️';
+    } catch(err){ console.error('getUserMedia', err); alert('მიკროფონის გამოყენება შეუძლებელია'); isRecording=false; }
+  });
+
+  // Reactions: open picker near toggle, apply reaction
+  let activeToggle = null;
+  document.addEventListener('click', (e)=>{
+    const toggle = e.target.closest('.reaction-toggle');
+    if(toggle){
+      e.stopPropagation();
+      const msgEl = toggle.closest('.message');
+      if(!msgEl) return;
+      if(activeToggle === toggle){ closeReactionPicker(); return; }
+      activeToggle = toggle;
+      positionPicker(toggle, reactionPicker);
+      reactionPicker.style.display='flex';
+      return;
+    }
+    const pick = e.target.closest('#reactionPicker button, .reaction-picker button');
+    if(pick && activeToggle){
+      const emoji = pick.dataset.emoji || pick.textContent;
+      const msgEl = activeToggle.closest('.message');
+      if(!msgEl) return;
+      const mid = msgEl.dataset.id;
+      const msg = messages.find(m=>m.id===mid);
+      if(!msg) return;
+      const found = (msg.reactions||[]).find(r=>r.emoji===emoji);
+      if(found) found.count += 1; else { msg.reactions = msg.reactions || []; msg.reactions.push({ emoji, count:1 }); }
+      msg.reactionCount = (msg.reactionCount||0) + 1;
+      save(LS_MESSAGES, messages);
+      renderMessages();
+      closeReactionPicker();
+      return;
+    }
+    if(!e.target.closest('.reaction-picker') && !e.target.closest('.reaction-toggle')) closeReactionPicker();
+  });
+
+  function closeReactionPicker(){ reactionPicker.style.display='none'; activeToggle = null; }
+  function positionPicker(toggle, picker){
+    const rect = toggle.getBoundingClientRect();
+    picker.style.left = Math.max(8, rect.left + rect.width/2 - picker.offsetWidth/2) + 'px';
+    picker.style.top = Math.max(8, rect.top - picker.offsetHeight - 12) + 'px';
+  }
+
+  // Emoji quick insert
+  emojiBtn.addEventListener('click', ()=>{
+    const emoji = '😊';
+    const el = composerInput; const s = el.selectionStart || el.value.length; const e = el.selectionEnd || s;
+    el.value = el.value.slice(0,s) + emoji + el.value.slice(e);
+    el.focus(); el.setSelectionRange(s+emoji.length, s+emoji.length);
+  });
+
+  // Close modals on Escape
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ closeModal(loginModal); closeModal(registerModal); closeModal(profileModal); closeModal(viewProfileModal); closeReactionPicker(); } });
+
+  // Utilities: save/load messages & users
+  function saveMessages(){ save(LS_MESSAGES, messages); }
+  function saveUsers(){ save(LS_USERS, users); }
+  function saveCurrent(){ save(LS_CURRENT, currentUser); }
+
+  // Initial setup
+  initDemo();
+  updateAuthUI();
+  renderUsers();
+  renderMessages();
+
+  // Expose for debugging (optional)
+  window._chat = { users, messages, currentUser };
+
+})(); // end IIFE
+</script>
 </body>
 </html>
-
