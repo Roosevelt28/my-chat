@@ -1,10 +1,41 @@
-// server.js — Express + Socket.IO realtime chat (public + private), session-integrated
+// server.js — Express + Socket.IO realtime chat with SQLite persistence (public + private), session-integrated
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const session = require('express-session');
 const cors = require('cors');
 const { Server } = require('socket.io');
+const Database = require('better-sqlite3');
+
+const APP_DIR = __dirname;
+const DB_PATH = path.join(APP_DIR, 'data.db');
+
+// ensure DB file exists
+if (!fs.existsSync(DB_PATH)) {
+  fs.writeFileSync(DB_PATH, '');
+}
+
+const db = new Database(DB_PATH);
+
+// Create tables if not exist
+db.prepare(`
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  username TEXT,
+  created_at INTEGER
+)`).run();
+
+db.prepare(`
+CREATE TABLE IF NOT EXISTS messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  from_user TEXT,
+  to_user TEXT,
+  text TEXT,
+  media_type TEXT,
+  media_url TEXT,
+  ts INTEGER
+)`).run();
 
 const app = express();
 const server = http.createServer(app);
@@ -14,7 +45,7 @@ const io = new Server(server, { cors: { origin: true, credentials: true } });
 
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this_secret';
 
-// Uncomment if behind TLS-terminating proxy (e.g., Render)
+// If behind TLS-terminating proxy (Render), uncomment:
 // app.set('trust proxy', 1);
 
 app.use(cors({ origin: true, credentials: true }));
@@ -38,16 +69,19 @@ io.use((socket, next) => {
   sessionMiddleware(socket.request, {}, next);
 });
 
-// Static files (client)
+// Serve static client
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Simple demo auth: login with nickname only
+// Simple demo auth: login with nickname only (stores session and lightweight user record)
 app.post('/api/login', (req, res) => {
   const nick = (req.body.nickname || '').trim();
   if (!nick) return res.status(400).json({ error: 'Nickname required' });
-  req.session.userId = 'u_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const userId = 'u_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  req.session.userId = userId;
   req.session.username = nick;
-  res.json({ ok: true, userId: req.session.userId, username: nick });
+  // upsert into users table (for reference)
+  db.prepare('INSERT OR REPLACE INTO users (id, username, created_at) VALUES (?, ?, ?)').run(userId, nick, Date.now());
+  res.json({ ok: true, userId, username: nick });
 });
 
 app.post('/api/logout', (req, res) => {
@@ -57,6 +91,33 @@ app.post('/api/logout', (req, res) => {
 app.get('/api/me', (req, res) => {
   if (!req.session.userId) return res.json({ user: null });
   res.json({ user: { id: req.session.userId, username: req.session.username } });
+});
+
+// REST endpoints for message history
+app.get('/api/messages/public', (req, res) => {
+  const rows = db.prepare(`
+    SELECT id, from_user, to_user, text, media_type, media_url, ts
+    FROM messages
+    WHERE to_user IS NULL
+    ORDER BY ts DESC
+    LIMIT 200
+  `).all();
+  res.json({ messages: rows.reverse() });
+});
+
+app.get('/api/messages/private/:username', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Not auth' });
+  const other = db.prepare('SELECT id, username FROM users WHERE username = ?').get(req.params.username);
+  if (!other) return res.status(404).json({ error: 'User not found' });
+
+  // fetch messages between session user and other
+  const rows = db.prepare(`
+    SELECT id, from_user, to_user, text, media_type, media_url, ts
+    FROM messages
+    WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
+    ORDER BY ts ASC
+  `).all(req.session.userId, other.id, other.id, req.session.userId);
+  res.json({ messages: rows });
 });
 
 // Presence tracking
@@ -94,6 +155,20 @@ io.on('connection', (socket) => {
     console.warn('session attach error', e);
   }
 
+  // Send recent public messages to this socket (init)
+  try {
+    const rows = db.prepare(`
+      SELECT id, from_user, to_user, text, media_type, media_url, ts
+      FROM messages
+      WHERE to_user IS NULL
+      ORDER BY ts DESC
+      LIMIT 200
+    `).all();
+    socket.emit('initMessages', rows.reverse());
+  } catch (e) {
+    console.error('initMessages error', e);
+  }
+
   io.emit('onlineCount', { count: onlineSockets.size });
   broadcastUsers();
 
@@ -110,54 +185,83 @@ io.on('connection', (socket) => {
           socket.request.session.username = socket.username;
           socket.request.session.save && socket.request.session.save();
         }
-      } catch {}
+      } catch (e) { /* ignore */ }
     }
     broadcastUsers();
   });
 
-  // Public message (broadcast to all)
+  // Public message (persist then broadcast)
   socket.on('chatMessage', ({ text }) => {
+    const cleanText = (text || '').trim();
+    if (!cleanText) return;
+    const fromUserId = socket.userId || null;
+    const ts = Date.now();
+    const info = db.prepare('INSERT INTO messages (from_user, to_user, text, media_type, media_url, ts) VALUES (?, ?, ?, ?, ?, ?)').run(
+      fromUserId, null, cleanText, null, null, ts
+    );
+    const dbId = info.lastInsertRowid;
     const msg = {
-      id: 'm_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-      text: (text || '').trim(),
+      id: dbId,
+      text: cleanText,
       username: socket.username,
-      userId: socket.userId || null,
-      ts: Date.now()
+      userId: fromUserId,
+      ts
     };
-    if (!msg.text) return;
     io.emit('message', msg);
   });
 
-  // Private message by recipient username
+  // Private message (persist then send to recipient sockets)
   socket.on('privateMessage', ({ toUsername, text }) => {
     const body = (text || '').trim();
     if (!toUsername || !body) return;
-    // find recipient userId by username
-    let toUserId = null;
-    for (const [uid, set] of socketsByUser.entries()) {
-      for (const sid of set) {
-        const s = io.sockets.sockets.get(sid);
-        if (s && s.username === toUsername) { toUserId = uid; break; }
+
+    // find recipient user record
+    const recipient = db.prepare('SELECT id, username FROM users WHERE username = ?').get(toUsername);
+    if (!recipient) {
+      // recipient might be a session-only user not in users table; try to find by socketsByUser
+      let foundId = null;
+      for (const [uid, set] of socketsByUser.entries()) {
+        for (const sid of set) {
+          const s = io.sockets.sockets.get(sid);
+          if (s && s.username === toUsername) { foundId = uid; break; }
+        }
+        if (foundId) break;
       }
-      if (toUserId) break;
+      if (!foundId) {
+        socket.emit('error', { error: 'Recipient not found' });
+        return;
+      }
+      recipient = { id: foundId, username: toUsername };
     }
+
+    const ts = Date.now();
+    const info = db.prepare('INSERT INTO messages (from_user, to_user, text, media_type, media_url, ts) VALUES (?, ?, ?, ?, ?, ?)').run(
+      socket.userId || null, recipient.id, body, null, null, ts
+    );
+    const dbId = info.lastInsertRowid;
+
     const msg = {
-      id: 'pm_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      id: dbId,
       text: body,
       fromUsername: socket.username,
       fromUserId: socket.userId || null,
-      toUsername,
-      toUserId,
-      ts: Date.now()
+      toUsername: recipient.username,
+      toUserId: recipient.id,
+      ts
     };
-    if (!toUserId || !socketsByUser.has(toUserId)) {
-      socket.emit('error', { error: 'Recipient not online' });
-      return;
+
+    // deliver to recipient sockets if online
+    const set = socketsByUser.get(recipient.id);
+    if (set && set.size > 0) {
+      for (const sid of set) {
+        io.to(sid).emit('privateMessage', msg);
+      }
+      // echo to sender
+      socket.emit('privateMessage', msg);
+    } else {
+      // recipient offline — still echo to sender and message is persisted for later retrieval
+      socket.emit('privateMessage', msg);
     }
-    for (const sid of socketsByUser.get(toUserId)) {
-      io.to(sid).emit('privateMessage', msg);
-    }
-    socket.emit('privateMessage', msg); // echo to sender
   });
 
   socket.on('disconnect', () => {
