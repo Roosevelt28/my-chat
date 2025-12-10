@@ -1,4 +1,4 @@
-// server.js — modified: session shared with Socket.IO, DB-backed message IDs, initMessages on connect
+// server.js — fixed: Socket.IO session integration for Render, CORS + cookies, DB-backed message IDs, initMessages on connect
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -78,25 +78,40 @@ const upload = multer({ storage, fileFilter, limits: { fileSize: 20 * 1024 * 102
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+
+// Socket.IO CORS will be configured to allow credentials
+const io = new Server(server, { cors: { origin: true, credentials: true } });
 
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this_secret';
-app.use(cors());
+
+// If behind a proxy (Render), trust proxy so secure cookies work when using HTTPS
+// Uncomment if you run behind a proxy that terminates TLS
+// app.set('trust proxy', 1);
+
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // --- session middleware (shared between express and socket.io)
+// cookie.sameSite set to 'lax' to allow cross-site navigation while protecting CSRF
 const sessionMiddleware = session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // set true in production with HTTPS
+  cookie: {
+    secure: false, // set to true in production when using HTTPS
+    sameSite: 'lax'
+  }
 });
 app.use(sessionMiddleware);
 
-// make session available to socket.io
+// IMPORTANT: when using Socket.IO on Render, socket.request.res is often undefined.
+// Pass an empty object as the response to the session middleware to avoid errors.
 io.use((socket, next) => {
-  sessionMiddleware(socket.request, socket.request.res || {}, next);
+  sessionMiddleware(socket.request, {}, next);
 });
 
 app.use(express.static(path.join(APP_DIR, 'public')));
@@ -323,6 +338,9 @@ function broadcastOnline() {
 }
 
 io.on('connection', socket => {
+  // Debug log for connection and session
+  console.log('[WS] socket connected', socket.id, 'sessionUserId=', socket.request && socket.request.session && socket.request.session.userId);
+
   // attach session userId automatically if present
   try {
     const sess = socket.request.session;
@@ -380,6 +398,7 @@ io.on('connection', socket => {
 
   // Public message
   socket.on('chatMessage', ({ text, media }) => {
+    console.log('[WS] chatMessage from socket', socket.id, 'userId=', socket.userId, 'text=', text && text.slice(0,120));
     // if sender is blocked, ignore
     if (socket.userId) {
       const sender = getUserById(socket.userId);
@@ -413,6 +432,7 @@ io.on('connection', socket => {
 
   // Private message
   socket.on('privateMessage', ({ toUsername, text, media }) => {
+    console.log('[WS] privateMessage from', socket.id, 'userId=', socket.userId, 'to=', toUsername, 'text=', text && text.slice(0,120));
     const toUser = getUserByName(toUsername);
     const fromUser = socket.userId ? getUserById(socket.userId) : null;
     const fromName = fromUser ? fromUser.username : socket.username;
@@ -501,6 +521,7 @@ io.on('connection', socket => {
   });
 
   socket.on('disconnect', () => {
+    console.log('[WS] disconnect', socket.id, 'userId=', socket.userId);
     onlineSockets.delete(socket.id);
     if (socket.userId) {
       const set = socketsByUser.get(socket.userId);
