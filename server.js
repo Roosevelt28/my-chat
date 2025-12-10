@@ -1,4 +1,4 @@
-// server.js — fixed: Socket.IO session integration for Render, CORS + cookies, DB-backed message IDs, initMessages on connect
+// server.js
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -9,7 +9,6 @@ const session = require('express-session');
 const cors = require('cors');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
 
 const APP_DIR = __dirname;
 const UPLOADS = path.join(APP_DIR, 'uploads');
@@ -23,31 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE,
   password TEXT,
-  first_name TEXT,
-  last_name TEXT,
-  nickname TEXT,
-  email TEXT,
-  age INTEGER,
-  avatar TEXT,
-  messages_visibility TEXT DEFAULT 'public',
-  allow_private INTEGER DEFAULT 1,
-  blocked INTEGER DEFAULT 0,
-  profile_locked INTEGER DEFAULT 0
-)`).run();
-
-db.prepare(`
-CREATE TABLE IF NOT EXISTS photos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER,
-  url TEXT,
-  created_at INTEGER
-)`).run();
-
-db.prepare(`
-CREATE TABLE IF NOT EXISTS friends (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER,
-  friend_user_id INTEGER
+  avatar TEXT
 )`).run();
 
 db.prepare(`
@@ -56,60 +31,46 @@ CREATE TABLE IF NOT EXISTS messages (
   from_user INTEGER,
   to_user INTEGER,
   text TEXT,
-  media_type TEXT,
   media_url TEXT,
+  media_type TEXT,
   ts INTEGER
 )`).run();
 
-// Multer setup
+// Multer for uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS),
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '';
-    cb(null, `${Date.now()}-${uuidv4()}${ext}`);
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`);
   }
 });
-function fileFilter (req, file, cb) {
-  const allowedExt = /\.(jpe?g|png|gif|webm|wav|mp3|ogg|mp4)$/i;
-  if (allowedExt.test(file.originalname)) cb(null, true);
-  else cb(new Error('Unsupported file type'), false);
-}
-const upload = multer({ storage, fileFilter, limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
 
 const app = express();
 const server = http.createServer(app);
 
-// Socket.IO CORS will be configured to allow credentials
+// Socket.IO with CORS allowing credentials
 const io = new Server(server, { cors: { origin: true, credentials: true } });
 
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this_secret';
 
-// If behind a proxy (Render), trust proxy so secure cookies work when using HTTPS
-// Uncomment if you run behind a proxy that terminates TLS
-// app.set('trust proxy', 1);
+// trust proxy if behind TLS terminator (Render)
+app.set('trust proxy', 1);
 
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- session middleware (shared between express and socket.io)
-// cookie.sameSite set to 'lax' to allow cross-site navigation while protecting CSRF
+// session middleware shared with socket.io
 const sessionMiddleware = session({
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: {
-    secure: false, // set to true in production when using HTTPS
-    sameSite: 'lax'
-  }
+  cookie: { secure: false, sameSite: 'lax' } // set secure: true in production with HTTPS
 });
 app.use(sessionMiddleware);
 
-// IMPORTANT: when using Socket.IO on Render, socket.request.res is often undefined.
-// Pass an empty object as the response to the session middleware to avoid errors.
+// make session available to socket.io; pass empty res object for Render compatibility
 io.use((socket, next) => {
   sessionMiddleware(socket.request, {}, next);
 });
@@ -124,39 +85,26 @@ function getUserById(id) {
 function getUserByName(username) {
   return db.prepare('SELECT * FROM users WHERE username = ?').get(username);
 }
-function getUserPhotosCount(userId) {
-  return db.prepare('SELECT COUNT(*) as c FROM photos WHERE user_id = ?').get(userId).c;
-}
-function areFriends(aId, bId) {
-  if (!aId || !bId) return false;
-  const r = db.prepare('SELECT id FROM friends WHERE user_id = ? AND friend_user_id = ?').get(aId, bId);
-  const r2 = db.prepare('SELECT id FROM friends WHERE user_id = ? AND friend_user_id = ?').get(bId, aId);
-  return !!(r || r2);
-}
 
-// Auth endpoints
+// Auth endpoints (simple)
 app.post('/api/register', (req, res) => {
-  const { username, password, first_name, last_name, nickname, email, age } = req.body;
+  const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   try {
     const hash = bcrypt.hashSync(password, 10);
-    const info = db.prepare(`
-      INSERT INTO users (username, password, first_name, last_name, nickname, email, age)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(username, hash, first_name || null, last_name || null, nickname || null, email || null, age ? Number(age) : null);
+    const info = db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(username, hash);
     req.session.userId = info.lastInsertRowid;
     req.session.username = username;
-    return res.json({ ok: true, userId: info.lastInsertRowid, username });
+    res.json({ ok: true, userId: info.lastInsertRowid, username });
   } catch (e) {
-    return res.status(400).json({ error: 'Username taken or invalid data' });
+    res.status(400).json({ error: 'Username taken or invalid' });
   }
 });
 
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-  const row = db.prepare('SELECT id, password, blocked FROM users WHERE username = ?').get(username);
+  const row = db.prepare('SELECT id, password FROM users WHERE username = ?').get(username);
   if (!row) return res.status(401).json({ error: 'Invalid credentials' });
-  if (row.blocked) return res.status(403).json({ error: 'User is blocked' });
   if (!bcrypt.compareSync(password, row.password)) return res.status(401).json({ error: 'Invalid credentials' });
   req.session.userId = row.id;
   req.session.username = username;
@@ -171,162 +119,36 @@ app.get('/api/me', (req, res) => {
   if (!req.session.userId) return res.json({ user: null });
   const u = getUserById(req.session.userId);
   if (!u) return res.json({ user: null });
-  res.json({ user: {
-    id: u.id, username: u.username, first_name: u.first_name, last_name: u.last_name,
-    nickname: u.nickname, email: u.email, age: u.age, avatar: u.avatar,
-    messages_visibility: u.messages_visibility, allow_private: !!u.allow_private,
-    blocked: !!u.blocked, profile_locked: !!u.profile_locked
-  }});
+  res.json({ user: { id: u.id, username: u.username, avatar: u.avatar } });
 });
 
-// Upload endpoints
+// Avatar upload
 app.post('/api/upload/avatar', upload.single('avatar'), (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not auth' });
+  if (!req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
   if (!req.file) return res.status(400).json({ error: 'No file' });
   const url = `/uploads/${req.file.filename}`;
   db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(url, req.session.userId);
   res.json({ ok: true, avatar: url });
 });
 
+// Message photo upload (optional separate endpoint)
 app.post('/api/upload/photo', upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file' });
   const url = `/uploads/${req.file.filename}`;
-  const personal = req.query.personal === '1';
-  if (personal) {
-    if (!req.session.userId) {
-      fs.unlinkSync(req.file.path);
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-    const count = getUserPhotosCount(req.session.userId);
-    if (count >= 10) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: 'პირადი ფოტოების ლიმიტი 10 არის' });
-    }
-    db.prepare('INSERT INTO photos (user_id, url, created_at) VALUES (?, ?, ?)').run(req.session.userId, url, Date.now());
-  }
   res.json({ ok: true, url });
 });
 
-app.post('/api/upload/audio', upload.single('audio'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file' });
-  const url = `/uploads/${req.file.filename}`;
-  res.json({ ok: true, url });
-});
-
-// Users and photos
-app.get('/api/users/:username/photos', (req, res) => {
-  const user = getUserByName(req.params.username);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  const photos = db.prepare('SELECT id, url, created_at FROM photos WHERE user_id = ? ORDER BY created_at DESC').all(user.id);
-  res.json({ photos });
-});
-
-app.get('/api/users/:username', (req, res) => {
-  const user = getUserByName(req.params.username);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  if (user.profile_locked) {
-    return res.json({
-      username: user.username,
-      first_name: null,
-      last_name: null,
-      nickname: user.nickname || null,
-      avatar: user.avatar || null,
-      age: null,
-      messages_visibility: user.messages_visibility,
-      allow_private: !!user.allow_private,
-      profile_locked: true
-    });
-  }
-  res.json({
-    username: user.username,
-    first_name: user.first_name || null,
-    last_name: user.last_name || null,
-    nickname: user.nickname || null,
-    avatar: user.avatar || null,
-    age: user.age || null,
-    messages_visibility: user.messages_visibility,
-    allow_private: !!user.allow_private,
-    profile_locked: !!user.profile_locked
-  });
-});
-
-// Settings and friends
-app.post('/api/me/settings', (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not auth' });
-  const { messages_visibility, allow_private } = req.body;
-  if (messages_visibility && !['public','friends','private'].includes(messages_visibility)) {
-    return res.status(400).json({ error: 'Invalid' });
-  }
-  db.prepare('UPDATE users SET messages_visibility = ?, allow_private = ? WHERE id = ?')
-    .run(messages_visibility || 'public', allow_private ? 1 : 0, req.session.userId);
-  res.json({ ok: true });
-});
-
-app.post('/api/friends/add', (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not auth' });
-  const { username } = req.body;
-  const friend = getUserByName(username);
-  if (!friend) return res.status(404).json({ error: 'User not found' });
-  const exists = db.prepare('SELECT id FROM friends WHERE user_id = ? AND friend_user_id = ?').get(req.session.userId, friend.id);
-  if (exists) return res.json({ ok: true });
-  db.prepare('INSERT INTO friends (user_id, friend_user_id) VALUES (?, ?)').run(req.session.userId, friend.id);
-  res.json({ ok: true });
-});
-
-app.post('/api/friends/remove', (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not auth' });
-  const { username } = req.body;
-  const friend = getUserByName(username);
-  if (!friend) return res.status(404).json({ error: 'User not found' });
-  db.prepare('DELETE FROM friends WHERE user_id = ? AND friend_user_id = ?').run(req.session.userId, friend.id);
-  res.json({ ok: true });
-});
-
-// Messages API (REST)
+// REST endpoint to fetch recent public messages
 app.get('/api/messages/public', (req, res) => {
-  const rows = db.prepare(`
-    SELECT id, from_user, to_user, text, media_type, media_url, ts
-    FROM messages
-    WHERE to_user IS NULL
-    ORDER BY ts DESC
-    LIMIT 200
-  `).all();
+  const rows = db.prepare('SELECT id, from_user, to_user, text, media_url, media_type, ts FROM messages WHERE to_user IS NULL ORDER BY ts DESC LIMIT 200').all();
   res.json({ messages: rows.reverse() });
 });
 
-app.get('/api/messages/private/:username', (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not auth' });
-  const other = getUserByName(req.params.username);
-  if (!other) return res.status(404).json({ error: 'User not found' });
-
-  // block checks
-  const me = getUserById(req.session.userId);
-  if (me.blocked) return res.status(403).json({ error: 'You are blocked' });
-  if (other.blocked) return res.status(403).json({ error: 'User is blocked' });
-
-  // visibility checks
-  if (other.messages_visibility === 'friends' && !areFriends(req.session.userId, other.id)) {
-    return res.status(403).json({ error: 'Messages visible to friends only' });
-  }
-  if (other.messages_visibility === 'private') {
-    return res.status(403).json({ error: 'User does not accept messages' });
-  }
-
-  const rows = db.prepare(`
-    SELECT id, from_user, to_user, text, media_type, media_url, ts
-    FROM messages
-    WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)
-    ORDER BY ts ASC
-  `).all(req.session.userId, other.id, other.id, req.session.userId);
-  res.json({ messages: rows });
-});
-
-// Socket.io: presence, messaging, typing, WebRTC signaling
+// Socket.IO realtime
 const socketsByUser = new Map(); // userId -> Set(socketId)
-const onlineSockets = new Set();  // socket ids
+const onlineSockets = new Set();
 
 function broadcastOnline() {
-  const onlineCount = onlineSockets.size;
   const onlineUsers = [];
   for (const [uid, set] of socketsByUser.entries()) {
     if (set.size > 0) {
@@ -334,14 +156,13 @@ function broadcastOnline() {
       if (u) onlineUsers.push({ id: u.id, username: u.username, avatar: u.avatar });
     }
   }
-  io.emit('onlineCount', { count: onlineCount, users: onlineUsers });
+  io.emit('online', { count: onlineSockets.size, users: onlineUsers });
 }
 
 io.on('connection', socket => {
-  // Debug log for connection and session
-  console.log('[WS] socket connected', socket.id, 'sessionUserId=', socket.request && socket.request.session && socket.request.session.userId);
+  console.log('[WS] connected', socket.id, 'sessionUserId=', socket.request && socket.request.session && socket.request.session.userId);
 
-  // attach session userId automatically if present
+  // attach session user if present
   try {
     const sess = socket.request.session;
     if (sess && sess.userId) {
@@ -350,7 +171,6 @@ io.on('connection', socket => {
       if (!socketsByUser.has(socket.userId)) socketsByUser.set(socket.userId, new Set());
       socketsByUser.get(socket.userId).add(socket.id);
     } else {
-      // fallback: anonymous username (client can still send 'identify' later)
       socket.username = `Guest${Math.floor(Math.random()*9000)}`;
     }
   } catch (e) {
@@ -360,168 +180,59 @@ io.on('connection', socket => {
   onlineSockets.add(socket.id);
   broadcastOnline();
 
-  // send recent public messages to this socket (init)
+  // send recent public messages on connect
   try {
-    const rows = db.prepare(`
-      SELECT id, from_user, to_user, text, media_type, media_url, ts
-      FROM messages
-      WHERE to_user IS NULL
-      ORDER BY ts DESC
-      LIMIT 200
-    `).all();
-    // send in chronological order
+    const rows = db.prepare('SELECT id, from_user, text, media_url, media_type, ts FROM messages WHERE to_user IS NULL ORDER BY ts DESC LIMIT 200').all();
     socket.emit('initMessages', rows.reverse());
   } catch (e) {
     console.error('initMessages error', e);
   }
 
+  socket.on('chatMessage', ({ text, media }) => {
+    console.log('[WS] chatMessage', socket.id, 'userId=', socket.userId);
+    const fromUserId = socket.userId || null;
+    const ts = Date.now();
+    const info = db.prepare('INSERT INTO messages (from_user, to_user, text, media_url, media_type, ts) VALUES (?, ?, ?, ?, ?, ?)').run(
+      fromUserId, null, text || '', media ? media.url : null, media ? media.type : null, ts
+    );
+    const dbId = info.lastInsertRowid;
+    const msg = { id: dbId, from_user: fromUserId, text: text || '', media_url: media ? media.url : null, media_type: media ? media.type : null, ts };
+    io.emit('message', msg);
+  });
+
+  socket.on('privateMessage', ({ toUserId, text, media }) => {
+    const toSet = socketsByUser.get(toUserId);
+    const fromUserId = socket.userId || null;
+    const ts = Date.now();
+    const info = db.prepare('INSERT INTO messages (from_user, to_user, text, media_url, media_type, ts) VALUES (?, ?, ?, ?, ?, ?)').run(
+      fromUserId, toUserId, text || '', media ? media.url : null, media ? media.type : null, ts
+    );
+    const dbId = info.lastInsertRowid;
+    const msg = { id: dbId, from_user: fromUserId, to_user: toUserId, text: text || '', media_url: media ? media.url : null, media_type: media ? media.type : null, ts };
+    if (toSet) for (const sid of toSet) io.to(sid).emit('privateMessage', msg);
+    socket.emit('privateMessage', msg);
+  });
+
   socket.on('identify', ({ userId, username }) => {
-    // fallback identification for clients without session cookie
+    // fallback for clients without session cookie
     socket.userId = userId || socket.userId || null;
-    socket.username = username || socket.username || `Guest${Math.floor(Math.random()*9000)}`;
+    socket.username = username || socket.username;
     if (socket.userId) {
       if (!socketsByUser.has(socket.userId)) socketsByUser.set(socket.userId, new Set());
       socketsByUser.get(socket.userId).add(socket.id);
-      // persist to session if available
       try {
         if (socket.request && socket.request.session) {
           socket.request.session.userId = socket.userId;
           socket.request.session.username = socket.username;
           socket.request.session.save && socket.request.session.save();
         }
-      } catch(e) { /* ignore */ }
+      } catch (e) {}
     }
-    const users = db.prepare('SELECT id, username, avatar FROM users').all();
-    io.emit('users', users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar })));
     broadcastOnline();
   });
 
-  // Public message
-  socket.on('chatMessage', ({ text, media }) => {
-    console.log('[WS] chatMessage from socket', socket.id, 'userId=', socket.userId, 'text=', text && text.slice(0,120));
-    // if sender is blocked, ignore
-    if (socket.userId) {
-      const sender = getUserById(socket.userId);
-      if (sender && sender.blocked) {
-        socket.emit('error', { error: 'You are blocked' });
-        return;
-      }
-    }
-    const fromUserId = socket.userId || null;
-    const username = socket.userId ? (getUserById(socket.userId) || {}).username : socket.username;
-    const ts = Date.now();
-
-    // insert into DB and get row id
-    const info = db.prepare('INSERT INTO messages (from_user, to_user, text, media_type, media_url, ts) VALUES (?, ?, ?, ?, ?, ?)').run(
-      fromUserId, null, text || '', media ? media.type : null, media ? media.url : null, ts
-    );
-    const dbId = info.lastInsertRowid;
-
-    const msg = {
-      id: dbId,
-      from_user: fromUserId,
-      username: username,
-      to_user: null,
-      text: text || '',
-      media_type: media ? media.type : null,
-      media_url: media ? media.url : null,
-      ts
-    };
-    io.emit('message', msg);
-  });
-
-  // Private message
-  socket.on('privateMessage', ({ toUsername, text, media }) => {
-    console.log('[WS] privateMessage from', socket.id, 'userId=', socket.userId, 'to=', toUsername, 'text=', text && text.slice(0,120));
-    const toUser = getUserByName(toUsername);
-    const fromUser = socket.userId ? getUserById(socket.userId) : null;
-    const fromName = fromUser ? fromUser.username : socket.username;
-    if (!toUser) {
-      socket.emit('error', { error: 'მომხმარებელი არ მოიძებნა' });
-      return;
-    }
-    // block checks
-    if (fromUser && fromUser.blocked) {
-      socket.emit('error', { error: 'You are blocked' });
-      return;
-    }
-    if (toUser.blocked) {
-      socket.emit('error', { error: 'Recipient is blocked' });
-      return;
-    }
-    // visibility checks
-    if (toUser.messages_visibility === 'friends' && !areFriends(socket.userId, toUser.id)) {
-      socket.emit('error', { error: 'Recipient accepts messages from friends only' });
-      return;
-    }
-    if (toUser.messages_visibility === 'private') {
-      socket.emit('error', { error: 'Recipient does not accept messages' });
-      return;
-    }
-
-    const ts = Date.now();
-    const info = db.prepare('INSERT INTO messages (from_user, to_user, text, media_type, media_url, ts) VALUES (?, ?, ?, ?, ?, ?)').run(
-      socket.userId || null, toUser.id, text || '', media ? media.type : null, media ? media.url : null, ts
-    );
-    const dbId = info.lastInsertRowid;
-
-    const msg = {
-      id: dbId,
-      from_user: socket.userId || null,
-      username: fromName,
-      to_user: toUser.id,
-      text: text || '',
-      media_type: media ? media.type : null,
-      media_url: media ? media.url : null,
-      ts
-    };
-    const set = socketsByUser.get(toUser.id);
-    if (set) { for (const sid of set) io.to(sid).emit('privateMessage', msg); }
-    socket.emit('privateMessage', msg);
-  });
-
-  // WebRTC signaling
-  socket.on('call-offer', ({ toUsername, offer, callType }) => {
-    const toUser = getUserByName(toUsername);
-    if (!toUser) return socket.emit('error', { error: 'User not found' });
-    const set = socketsByUser.get(toUser.id);
-    if (set) {
-      for (const sid of set) io.to(sid).emit('incoming-call', { from: socket.username || 'Anonymous', fromUserId: socket.userId, offer, callType });
-    }
-  });
-  socket.on('call-answer', ({ toUsername, answer }) => {
-    const toUser = getUserByName(toUsername);
-    if (!toUser) return;
-    const set = socketsByUser.get(toUser.id);
-    if (set) { for (const sid of set) io.to(sid).emit('call-answered', { from: socket.username || 'Anonymous', answer }); }
-  });
-  socket.on('call-candidate', ({ toUsername, candidate }) => {
-    const toUser = getUserByName(toUsername);
-    if (!toUser) return;
-    const set = socketsByUser.get(toUser.id);
-    if (set) { for (const sid of set) io.to(sid).emit('call-candidate', { from: socket.username || 'Anonymous', candidate }); }
-  });
-  socket.on('call-end', ({ toUsername }) => {
-    const toUser = getUserByName(toUsername);
-    if (!toUser) return;
-    const set = socketsByUser.get(toUser.id);
-    if (set) { for (const sid of set) io.to(sid).emit('call-ended', { from: socket.username || 'Anonymous' }); }
-  });
-
-  // Typing
-  socket.on('typing', ({ toUsername, isTyping }) => {
-    if (toUsername) {
-      const toUser = getUserByName(toUsername);
-      if (!toUser) return;
-      const set = socketsByUser.get(toUser.id);
-      if (set) { for (const sid of set) io.to(sid).emit('typing', { from: socket.username || 'Anonymous', private: true, isTyping }); }
-    } else {
-      socket.broadcast.emit('typing', { from: socket.username || 'Anonymous', private: false, isTyping });
-    }
-  });
-
   socket.on('disconnect', () => {
-    console.log('[WS] disconnect', socket.id, 'userId=', socket.userId);
+    console.log('[WS] disconnect', socket.id);
     onlineSockets.delete(socket.id);
     if (socket.userId) {
       const set = socketsByUser.get(socket.userId);
