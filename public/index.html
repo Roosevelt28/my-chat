@@ -3,14 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>ChatApp —</title>
+<title>ChatApp — Realtime (Firestore) — სრული ვერსია</title>
 <style>
 :root{
   --bg-dark-1:#071024; --bg-dark-2:#071a2a;
   --panel-dark:rgba(255,255,255,0.02);
   --accent:#06b6d4; --muted:#94a3b8; --text-dark:#e6eef6;
   --radius:12px;
-  --reaction-w:320px; --reaction-btn:40px; --reaction-font:20px;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,Helvetica;-webkit-font-smoothing:antialiased}
@@ -22,10 +21,8 @@ body.light{background:#fff;color:#0b1220}
 body.light .header-left{border-bottom-color:rgba(2,6,23,0.06)}
 .brand{font-weight:700;color:var(--accent)}
 .online-indicator{font-size:13px;color:var(--muted)}
-
-/* Messages */
 .messages{flex:1;padding:12px;overflow:auto;display:flex;flex-direction:column;gap:10px;position:relative;-webkit-overflow-scrolling:touch}
-.message{max-width:80%;padding:10px;border-radius:12px; position: relative; z-index:1; word-break:break-word; display:block; box-shadow: 0 6px 18px rgba(2,6,23,0.25);}
+.message{max-width:80%;padding:10px;border-radius:12px; position: relative; z-index:1; word-break:break-word; display:block; box-shadow: 0 6px 18px rgba(2,6,23,0.18);}
 .me{align-self:flex-end;background:linear-gradient(90deg,#0ea5a4,#0891b2);color:#042027}
 .other{align-self:flex-start;background:rgba(255,255,255,0.03);color:var(--muted)}
 body.light .other{background:rgba(2,6,23,0.04);color:#0b1220}
@@ -33,78 +30,41 @@ body.light .other{background:rgba(2,6,23,0.04);color:#0b1220}
 .msg-header img{width:28px;height:28px;border-radius:50%;object-fit:cover}
 .msg-author{font-weight:700;font-size:13px}
 .meta{font-size:11px;opacity:0.9;margin-top:6px;text-align:right}
-
-/* Composer */
 .composer{display:flex;gap:8px;padding:12px;border-top:1px solid rgba(255,255,255,0.02);align-items:center;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);position:sticky;bottom:0;left:0;right:0;backdrop-filter: blur(6px);z-index:1400;padding-bottom: calc(env(safe-area-inset-bottom) + 12px);}
 .left-group{display:flex;gap:8px;align-items:center}
 .input{flex:1;min-width:0;padding:12px 14px;border-radius:10px;border:0;background:rgba(255,255,255,0.02);color:inherit;font-size:16px;height:48px;line-height:20px}
 body.light .input{background:rgba(2,6,23,0.04);color:#0b1220}
-.input::placeholder{color:rgba(230,238,246,0.5)}
 .icon-btn{width:44px;height:44px;border-radius:10px;border:0;background:rgba(255,255,255,0.03);display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
 body.light .icon-btn{background:rgba(2,6,23,0.03);color:#0b1220}
 .send-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;background:var(--accent);border:0;border-radius:10px;color:#042027;cursor:pointer;font-weight:700;min-height:44px;min-width:64px;justify-content:center}
-
-/* Users */
-.top-controls{display:flex;gap:8px;align-items:center;padding:12px}
 .users-list{padding:12px;background:rgba(255,255,255,0.01);border-radius:8px;overflow:auto}
-body.light .users-list{background:rgba(2,6,23,0.03)}
 .user-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:6px;cursor:pointer}
 .user-item img{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:8px}
-.user-item .name { font-weight:600; }
-
-/* Modal */
 .modal{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:3000}
 .modal.hidden{display:none}
 .modal .box{background:#071a2a;padding:16px;border-radius:8px;min-width:320px;color:var(--text-dark);position:relative;max-height:calc(100vh - 48px);overflow:auto;width:520px;max-width:calc(100% - 48px)}
 body.light .modal .box{background:#fff;color:#0b1220}
 .close{position:absolute;right:12px;top:8px;background:transparent;border:0;color:var(--muted);cursor:pointer}
 .avatar-large{width:96px;height:96px;border-radius:50%;object-fit:cover}
-img.uploaded{max-width:240px;border-radius:8px;display:block;margin-top:8px}
-audio.uploaded{display:block;margin-top:8px}
-
-/* Reaction picker (improved) */
-.reaction-toggle { background: transparent; border: 1px solid rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: inherit; position: relative; z-index: 2; min-height: 44px; min-width: 44px; }
-.reaction-panel { display:flex; gap:8px; align-items:center; padding:6px; border-radius:999px; background: rgba(0,0,0,0.06); position: absolute; z-index:1200; box-shadow: 0 8px 24px rgba(2,6,23,0.4); transform-origin: bottom center; }
-.reaction-panel button { background:transparent;border:0;padding:6px;border-radius:8px;font-size:20px;cursor:pointer; width:40px;height:40px; display:flex;align-items:center;justify-content:center; }
-.reaction-list { display:flex; gap:6px; align-items:center; margin-top:8px; flex-wrap:wrap; }
-.reaction-item { display:inline-flex; align-items:center; gap:6px; padding:6px 8px; border-radius:999px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); cursor:pointer; }
-.reaction-item.active { background: rgba(6,182,212,0.12); border-color: rgba(6,182,212,0.18); color: #06b6d4; }
-
-/* Actions & reactions */
-.msg-actions { display:flex; gap:8px; align-items:center; margin-top:8px; }
-.btn-delete { background: transparent; border: 1px solid rgba(255,255,255,0.04); color: #ffb4b4; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-
-/* Recorder button */
-.record-btn { width:48px;height:48px;border-radius:12px;border:0;background:linear-gradient(180deg,#06b6d4,#0284a2);color:#042027;display:inline-flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:transform .08s ease; }
-.record-btn.recording { background:linear-gradient(180deg,#ff3b3b,#c40000); box-shadow:0 8px 24px rgba(196,0,0,0.12); transform:scale(1.02); }
-
-/* viewProfile collapse */
-#viewProfileModal.view-collapsed .box { max-height:64px; overflow:hidden; transition: max-height 220ms ease; }
-#collapseViewBtn.collapsed svg { transform: rotate(180deg); transition: transform 180ms ease; }
-
-/* Mobile adjustments */
-@media (max-width:900px) {
-  .app{grid-template-columns:1fr; padding:8px; height:100vh}
+.reaction-list{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.reaction-item{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);cursor:pointer}
+.reaction-item.active{background:rgba(6,182,212,0.12);border-color:rgba(6,182,212,0.18);color:#06b6d4}
+.btn-delete{background:transparent;border:1px solid rgba(255,255,255,0.04);color:#ffb4b4;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px}
+.record-btn{width:48px;height:48px;border-radius:12px;border:0;background:linear-gradient(180deg,#06b6d4,#0284a2);color:#042027;display:inline-flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:transform .08s ease}
+.record-btn.recording{background:linear-gradient(180deg,#ff3b3b,#c40000);box-shadow:0 8px 24px rgba(196,0,0,0.12);transform:scale(1.02)}
+#viewProfileModal.view-collapsed .box{max-height:64px;overflow:hidden;transition:max-height 220ms ease}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;padding:8px;height:100vh}
   .right-col{display:none}
-  .messages{padding:10px 6px; gap:8px}
-  .message{max-width:92%; padding:10px; border-radius:12px}
+  .messages{padding:10px 6px;gap:8px}
+  .message{max-width:92%}
   .composer{padding:10px;gap:6px}
   .input{height:52px;padding:12px 12px;font-size:16px;border-radius:12px}
   .icon-btn{width:48px;height:48px;border-radius:12px}
   .send-btn{min-width:56px;padding:10px 12px;border-radius:12px}
   .modal .box{width:calc(100% - 24px);max-height:calc(100vh - 24px);margin:12px}
   .avatar-large{width:72px;height:72px}
-  .msg-header img{width:36px;height:36px}
-  .reaction-panel{position:fixed; bottom:84px; left:50%; transform:translateX(-50%); }
-  .reaction-list{justify-content:center}
-  .composer{position:sticky;bottom:0}
 }
-
-/* focus */
-.reaction-toggle:focus-visible, .reaction-panel button:focus-visible, .icon-btn:focus-visible, .send-btn:focus-visible { outline: 3px solid rgba(6,182,212,0.14); outline-offset: 3px; border-radius: 10px; }
-
-/* subtle pop */
-@keyframes pop { from { transform: scale(.96); opacity:0 } to { transform: scale(1); opacity:1 } }
 </style>
 </head>
 <body>
@@ -115,26 +75,12 @@ audio.uploaded{display:block;margin-top:8px}
         <div class="brand">ChatApp</div>
         <div class="online-indicator" id="statusText">გთხოვთ შეხვიდეთ ან დარეგისტრირდეთ</div>
       </div>
-      <div id="headerButtons" style="display:flex;gap:8px;align-items:center">
-        <button id="themeToggle" class="icon-btn" title="თემის გადართვა" aria-label="თემა">
-          <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path id="themeMoon" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="#06b6d4" opacity="0.12"/><path d="M21 12.79A9 9 0 1111.21 3" stroke="#06b6d4" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-
-        <button id="loginHeaderBtn" class="icon-btn" title="შესვლა" aria-label="შესვლა">
-          🔐
-        </button>
-
-        <button id="openRegisterBtn" class="icon-btn" title="რეგისტრაცია" aria-label="რეგისტრაცია">
-          ✍️
-        </button>
-
-        <button id="openProfileBtn" class="icon-btn" title="პროფილი" aria-label="პროფილი" style="display:none">
-          👤
-        </button>
-
-        <button id="logoutBtn" class="icon-btn" title="გასვლა" aria-label="გასვლა" style="display:none">
-          ⎋
-        </button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="themeToggle" class="icon-btn" title="თემის გადართვა" aria-label="თემა">🌓</button>
+        <button id="loginHeaderBtn" class="icon-btn" title="შესვლა" aria-label="შესვლა">🔐</button>
+        <button id="openRegisterBtn" class="icon-btn" title="რეგისტრაცია" aria-label="რეგისტრაცია">✍️</button>
+        <button id="openProfileBtn" class="icon-btn" title="პროფილი" aria-label="პროფილი" style="display:none">👤</button>
+        <button id="logoutBtn" class="icon-btn" title="გასვლა" aria-label="გასვლა" style="display:none">⎋</button>
       </div>
     </div>
 
@@ -142,16 +88,11 @@ audio.uploaded{display:block;margin-top:8px}
 
     <div class="composer" role="region" aria-label="შეტყობინების შემქმნელი">
       <div class="left-group">
-        <label class="file-label" title="ატვირთვა">
+        <label title="ატვირთვა">
           <input id="fileInput" type="file" accept="image/*,audio/*" style="display:none" />
           <button id="attachBtn" class="icon-btn" aria-label="ატვირთვა" title="ატვირთვა">📎</button>
         </label>
-
-        <!-- Emoji quick-insert removed per request -->
-
-        <button id="recordBtn" class="record-btn" title="ჩაწერე ხმოვანი" aria-pressed="false" aria-label="ჩაწერა">
-          🎤
-        </button>
+        <button id="recordBtn" class="record-btn" title="ჩაწერე ხმოვანი" aria-pressed="false" aria-label="ჩაწერა">🎤</button>
       </div>
 
       <input id="composerInput" class="input" type="text" placeholder="დაწერეთ შეტყობინება..." aria-label="შეტყობინების ტექსტი" />
@@ -160,19 +101,19 @@ audio.uploaded{display:block;margin-top:8px}
   </div>
 
   <aside class="right-col" aria-label="მომხმარებლები">
-    <div class="top-controls">
-      <input id="searchUsers" type="search" placeholder="ძიება" style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.01);color:inherit" />
-      <button id="openRegisterBtn2" class="icon-btn" aria-label="რეგისტრაცია" title="რეგისტრაცია">✍️</button>
+    <div style="display:flex;gap:8px;align-items:center;padding:12px">
+      <input id="searchUsers" placeholder="ძიება" style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.01)" />
+      <button id="openRegisterBtn2" class="icon-btn" title="რეგისტრაცია">✍️</button>
     </div>
-    <div class="users-list" id="usersList" aria-label="მომხმარებლები"></div>
+    <div class="users-list" id="usersList"></div>
   </aside>
 </div>
 
-<!-- Profile modal (current user) -->
-<div class="modal hidden" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+<!-- Profile modal -->
+<div class="modal hidden" id="profileModal" role="dialog" aria-modal="true">
   <div class="box" tabindex="0">
-    <button class="close" id="closeProfile" aria-label="დახურვა">✕</button>
-    <h3 id="profileTitle">პროფილი</h3>
+    <button class="close" id="closeProfile">✕</button>
+    <h3>პროფილი</h3>
     <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
       <img id="profileAvatar" class="avatar-large" src="https://picsum.photos/96" alt="პროფილი" />
       <div>
@@ -180,12 +121,10 @@ audio.uploaded{display:block;margin-top:8px}
         <div id="profileNickname" style="color:var(--muted);margin-top:6px">@ნიკნეიმი</div>
       </div>
     </div>
-    <div class="small" style="margin-top:12px">დაბ. წელი: <span id="profileYear">----</span> • ასაკი: <span id="profileAge">--</span></div>
+    <div style="margin-top:12px" class="small">დაბ. წელი: <span id="profileYear">----</span> • ასაკი: <span id="profileAge">--</span></div>
     <div style="margin-top:12px;display:flex;gap:8px">
-      <label style="display:inline-flex;align-items:center;gap:8px">
-        <input id="avatarUploadInput" type="file" accept="image/*" style="display:none" />
-        <button id="changeAvatarBtn" class="send-btn">ავატარის შეცვლა</button>
-      </label>
+      <input id="avatarUploadInput" type="file" accept="image/*" style="display:none" />
+      <button id="changeAvatarBtn" class="send-btn">ავატარის შეცვლა</button>
       <button id="editProfileBtn" class="icon-btn">✎</button>
       <button id="closeProfileBtn" class="send-btn">დახურვა</button>
     </div>
@@ -193,43 +132,43 @@ audio.uploaded{display:block;margin-top:8px}
 </div>
 
 <!-- Register modal -->
-<div class="modal hidden" id="registerModal" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
+<div class="modal hidden" id="registerModal" role="dialog" aria-modal="true">
   <div class="box" tabindex="0">
-    <button class="close" id="closeRegister" aria-label="დახურვა">✕</button>
-    <h3 id="registerTitle">რეგისტრაცია</h3>
+    <button class="close" id="closeRegister">✕</button>
+    <h3>რეგისტრაცია</h3>
     <form id="registerForm" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
-      <label style="display:flex;flex-direction:column;gap:6px"><span class="small">სახელი</span><input id="regFirst" type="text" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:inherit" /></label>
-      <label style="display:flex;flex-direction:column;gap:6px"><span class="small">გვარი</span><input id="regLast" type="text" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:inherit" /></label>
+      <input id="regFirst" placeholder="სახელი" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
+      <input id="regLast" placeholder="გვარი" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
       <div style="display:flex;gap:8px">
-        <label style="flex:1;display:flex;flex-direction:column;gap:6px"><span class="small">დაბ. წელი</span><input id="regYear" type="number" min="1900" max="2025" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:inherit" /></label>
-        <label style="flex:1;display:flex;flex-direction:column;gap:6px"><span class="small">ნიკ ნეიმი</span><input id="regNick" type="text" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:inherit" /></label>
+        <input id="regYear" placeholder="დაბ. წელი" type="number" min="1900" max="2025" required style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
+        <input id="regNick" placeholder="ნიკ ნეიმი" required style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
       </div>
       <div style="display:flex;gap:8px">
-        <label style="flex:1;display:flex;flex-direction:column;gap:6px"><span class="small">პაროლი</span><input id="regPass" type="password" minlength="6" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:inherit" /></label>
-        <label style="flex:1;display:flex;flex-direction:column;gap:6px"><span class="small">გაიმეორეთ</span><input id="regPassConfirm" type="password" minlength="6" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:inherit" /></label>
+        <input id="regPass" placeholder="პაროლი" type="password" minlength="6" required style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
+        <input id="regPassConfirm" placeholder="გაიმეორეთ" type="password" minlength="6" required style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
       </div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+      <div style="display:flex;gap:8px;align-items:center">
         <input id="regAvatarInput" type="file" accept="image/*" style="display:none" />
         <button type="button" id="regAvatarBtn" class="icon-btn">📷</button>
         <div id="regAvatarPreview" class="small">ავატარი (არასავალდებულო)</div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
+      <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="submit" class="send-btn">რეგისტრაცია</button>
-        <button type="button" id="openLoginFromRegisterBtn" class="icon-btn" title="შესვლა">🔐</button>
+        <button type="button" id="openLoginFromRegisterBtn" class="icon-btn">🔐</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- Login modal -->
-<div class="modal hidden" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+<div class="modal hidden" id="loginModal" role="dialog" aria-modal="true">
   <div class="box" tabindex="0">
-    <button class="close" id="closeLogin" aria-label="დახურვა">✕</button>
-    <h3 id="loginTitle">შესვლა</h3>
+    <button class="close" id="closeLogin">✕</button>
+    <h3>შესვლა</h3>
     <form id="loginForm" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
-      <label style="display:flex;flex-direction:column;gap:6px"><span class="small">ნიკ ნეიმი</span><input id="loginNick" type="text" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:inherit" /></label>
-      <label style="display:flex;flex-direction:column;gap:6px"><span class="small">პაროლი</span><input id="loginPass" type="password" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:inherit" /></label>
-      <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end">
+      <input id="loginNick" placeholder="ნიკ ნეიმი" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
+      <input id="loginPass" placeholder="პაროლი" type="password" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
+      <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="submit" class="send-btn">შესვლა</button>
         <button type="button" id="openRegisterFromLoginBtn" class="icon-btn">✍️</button>
       </div>
@@ -237,21 +176,16 @@ audio.uploaded{display:block;margin-top:8px}
   </div>
 </div>
 
-<!-- View other user's profile modal (with collapse button) -->
-<div class="modal hidden" id="viewProfileModal" role="dialog" aria-modal="true" aria-labelledby="viewProfileTitle">
+<!-- View other user's profile modal -->
+<div class="modal hidden" id="viewProfileModal" role="dialog" aria-modal="true">
   <div class="box" tabindex="0">
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:12px">
-        <h3 id="viewProfileTitle" style="margin:0">მომხმარებლის პროფილი</h3>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button id="collapseViewBtn" class="icon-btn" title="ჩაკეცვა" aria-label="ჩაკეცვა" style="margin-right:6px">
-          ⤢
-        </button>
-        <button class="close" id="closeViewProfile" aria-label="დახურვა">✕</button>
+      <h3 id="viewProfileTitle" style="margin:0">მომხმარებლის პროფილი</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="collapseViewBtn" class="icon-btn" title="ჩაკეცვა">⤢</button>
+        <button class="close" id="closeViewProfile">✕</button>
       </div>
     </div>
-
     <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
       <img id="viewAvatar" class="avatar-large" src="https://picsum.photos/96" alt="ავატარი" />
       <div>
@@ -259,17 +193,33 @@ audio.uploaded{display:block;margin-top:8px}
         <div id="viewNickname" style="color:var(--muted);margin-top:6px">@ნიკნეიმი</div>
       </div>
     </div>
-    <div class="small" style="margin-top:12px">დაბ. წელი: <span id="viewYear">----</span> • ასაკი: <span id="viewAge">--</span></div>
+    <div style="margin-top:12px" class="small">დაბ. წელი: <span id="viewYear">----</span> • ასაკი: <span id="viewAge">--</span></div>
   </div>
 </div>
 
-<!-- Reaction panel placeholder (will be positioned near message) -->
-<div id="reactionPanel" class="reaction-panel" style="display:none;">
-  <!-- buttons inserted dynamically -->
-</div>
+<!-- Firebase SDK (modular) init placeholder -->
+<script type="module">
+  // Import Firebase modular SDK and expose minimal helpers on window._firebase
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+  // --- REPLACE with your Firebase config from console ---
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    // optional: storageBucket, messagingSenderId, appId
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Expose to global for main script to use
+  window._firebase = { db, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp };
+</script>
 
 <script>
-/* Final JS: reaction toggle improved, emoji removed from composer, theme toggle fixed, profile shows birth year + age, mobile tweaks */
+/* Main chat script with Firestore realtime sync */
 (async function(){
   const $ = id => document.getElementById(id);
 
@@ -281,7 +231,6 @@ audio.uploaded{display:block;margin-top:8px}
   const attachBtn = $('attachBtn');
   const fileInput = $('fileInput');
   const recordBtn = $('recordBtn');
-  const reactionPanel = $('reactionPanel');
 
   const loginHeaderBtn = $('loginHeaderBtn');
   const openRegisterBtn = $('openRegisterBtn');
@@ -290,7 +239,6 @@ audio.uploaded{display:block;margin-top:8px}
   const logoutBtn = $('logoutBtn');
   const statusText = $('statusText');
   const themeToggle = $('themeToggle');
-  const themeIcon = $('themeIcon');
 
   const profileModal = $('profileModal');
   const closeProfile = $('closeProfile');
@@ -300,6 +248,7 @@ audio.uploaded{display:block;margin-top:8px}
   const editProfileBtn = $('editProfileBtn');
 
   const registerModal = $('registerModal');
+  const closeRegister = $('closeRegister');
   const registerForm = $('registerForm');
   const regFirst = $('regFirst');
   const regLast = $('regLast');
@@ -313,6 +262,7 @@ audio.uploaded{display:block;margin-top:8px}
   const openLoginFromRegisterBtn = $('openLoginFromRegisterBtn');
 
   const loginModal = $('loginModal');
+  const closeLogin = $('closeLogin');
   const loginForm = $('loginForm');
   const loginNick = $('loginNick');
   const loginPass = $('loginPass');
@@ -326,17 +276,22 @@ audio.uploaded{display:block;margin-top:8px}
   const viewYear = $('viewYear');
   const viewAge = $('viewAge');
 
+  // Firestore helpers (must be available from module script)
+  const FB = window._firebase || null;
+  if(!FB){
+    console.warn('Firebase not initialized. Add firebase config script before main script.');
+  }
+
   // Storage keys
-  const LS_USERS = 'chatapp_users_final_v2';
-  const LS_CURRENT = 'chatapp_current_final_v2';
-  const LS_MESSAGES = 'chatapp_messages_final_v2';
-  const LS_THEME = 'chatapp_theme_final_v2';
+  const LS_USERS = 'chatapp_users';
+  const LS_CURRENT = 'chatapp_current';
+  const LS_MESSAGES = 'chatapp_messages';
+  const LS_THEME = 'chatapp_theme';
 
   // State
   let users = safeLoad(LS_USERS) || [];
   let currentUser = safeLoad(LS_CURRENT) || null;
-  let messages = safeLoad(LS_MESSAGES) || [];
-
+  let messages = []; // will be populated from Firestore snapshot
   let pendingFile = null;
   let pendingPreviewEl = null;
 
@@ -346,9 +301,6 @@ audio.uploaded{display:block;margin-top:8px}
   let recordingChunks = [];
   let isRecording = false;
 
-  // Reaction set (default quick set)
-  const QUICK_REACTIONS = ['👍','❤️','😂','😮','😢','🔥','🤩'];
-
   // Helpers
   function safeLoad(key){ try { return JSON.parse(localStorage.getItem(key)); } catch(e){ return null; } }
   function safeSave(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
@@ -357,21 +309,14 @@ audio.uploaded{display:block;margin-top:8px}
   function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   async function sha256Hex(str){ try { const enc = new TextEncoder(); const data = enc.encode(str); const hash = await crypto.subtle.digest('SHA-256', data); return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join(''); } catch(e){ return null; } }
 
-  // Init demo
-  function initDemo(){
+  // Demo users if none
+  function initDemoUsers(){
     if(!Array.isArray(users) || users.length === 0){
       users = [
         { id: 'u_demo1', first:'ანა', last:'მცირიშვილი', year:1992, nick:'ana92', avatar:'https://picsum.photos/seed/ana/96', passHash:null },
         { id: 'u_demo2', first:'გიორგი', last:'კაპანაძე', year:1988, nick:'giorgi88', avatar:'https://picsum.photos/seed/giorgi/96', passHash:null }
       ];
       safeSave(LS_USERS, users);
-    }
-    if(!Array.isArray(messages) || messages.length === 0){
-      messages = [
-        { id: uid('m'), text:'გამარჯობა! ეს არის დემო მესიჯი.', userId: users[0].id, time: timeNow(), reactions:[], reactionCount:0 },
-        { id: uid('m'), text:'კარგად, მადლობა!', userId: users[1].id, time: timeNow(), reactions:[], reactionCount:0 }
-      ];
-      safeSave(LS_MESSAGES, messages);
     }
   }
 
@@ -383,12 +328,12 @@ audio.uploaded{display:block;margin-top:8px}
       const item = document.createElement('div');
       item.className = 'user-item';
       const isMe = currentUser && currentUser.id === u.id;
-      item.innerHTML = `<div style="display:flex;align-items:center"><img src="${u.avatar||'https://picsum.photos/36'}" alt="" style="width:36px;height:36px;border-radius:50%"/><div style="margin-left:8px"><strong>${escapeHtml(u.first)} ${escapeHtml(u.last)}</strong><div class="small">@${escapeHtml(u.nick)}</div></div></div><div>${isMe?'<span class="small">მე</span>':'<button class="icon-btn view-profile-btn" data-id="'+u.id+'" title="ნახვა">👁️</button>'}</div>`;
+      item.innerHTML = `<div style="display:flex;align-items:center"><img src="${u.avatar||'https://picsum.photos/36'}" alt="" /><div style="margin-left:8px"><strong>${escapeHtml(u.first)} ${escapeHtml(u.last)}</strong><div class="small">@${escapeHtml(u.nick)}</div></div></div><div>${isMe?'<span class="small">მე</span>':'<button class="icon-btn view-profile-btn" data-id="'+u.id+'" title="ნახვა">👁️</button>'}</div>`;
       usersListEl.appendChild(item);
     });
   }
 
-  // Render messages (with reaction list)
+  // Render messages (from messages array)
   function renderMessages(){
     if(!messagesEl) return;
     messagesEl.innerHTML = '';
@@ -418,35 +363,27 @@ audio.uploaded{display:block;margin-top:8px}
         }
       }
 
-      // reactions display
-      const reactionList = document.createElement('div'); reactionList.className = 'reaction-list';
+      // reactions
+      const reactionWrap = document.createElement('div'); reactionWrap.className = 'reaction-list';
       (m.reactions || []).forEach(r=>{
         const item = document.createElement('div');
-        item.className = 'reaction-item' + ((r.users || []).includes(currentUser ? currentUser.id : '') ? ' active' : '');
+        const userHas = Array.isArray(r.users) && currentUser && r.users.includes(currentUser.id);
+        item.className = 'reaction-item' + (userHas ? ' active' : '');
         item.dataset.emoji = r.emoji;
         item.innerHTML = `${escapeHtml(r.emoji)} <span class="small">${r.count}</span>`;
-        // clicking a reaction toggles current user's reaction for that emoji
-        item.addEventListener('click', (ev)=>{
-          ev.stopPropagation();
-          toggleReaction(m.id, r.emoji);
-        });
-        reactionList.appendChild(item);
+        item.addEventListener('click', (ev)=>{ ev.stopPropagation(); toggleReaction(m.id, r.emoji); });
+        reactionWrap.appendChild(item);
       });
 
-      // reaction toggle button (opens panel)
       const actions = document.createElement('div'); actions.className='msg-actions';
       const toggle = document.createElement('button'); toggle.className='reaction-toggle'; toggle.setAttribute('aria-expanded','false'); toggle.textContent='🙂';
-      toggle.addEventListener('click', (ev)=> {
-        ev.stopPropagation();
-        openReactionPanelForMessage(el, m.id);
-      });
+      toggle.addEventListener('click', (ev)=>{ ev.stopPropagation(); openReactionPanelForMessage(el, m.id); });
       actions.appendChild(toggle);
-      actions.appendChild(reactionList);
+      actions.appendChild(reactionWrap);
 
-      // delete if owner
       if(currentUser && m.userId === currentUser.id){
         const del = document.createElement('button'); del.className='btn-delete'; del.textContent='წაშლა';
-        del.addEventListener('click', ()=>{ if(confirm('ნამდვილად წაშლა?')){ messages = messages.filter(x=>x.id!==m.id); safeSave(LS_MESSAGES, messages); renderMessages(); }});
+        del.addEventListener('click', ()=>{ if(confirm('ნამდვილად წაშლა?')){ deleteMessage(m.id); }});
         actions.appendChild(del);
       }
 
@@ -456,14 +393,14 @@ audio.uploaded{display:block;margin-top:8px}
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  // Reaction logic: messages[].reactions = [{emoji, count, users: [userIds]}]
+  // Reaction helpers
   function ensureReactionStructure(msg){
     if(!msg.reactions) msg.reactions = [];
     msg.reactions.forEach(r => { if(!Array.isArray(r.users)) r.users = []; if(typeof r.count !== 'number') r.count = r.users.length; });
   }
 
   function toggleReaction(messageId, emoji){
-    if(!currentUser) { alert('რეაქციის დასამატებლად საჭიროა შესვლა'); return; }
+    if(!currentUser){ alert('რეაქციის დასამატებლად საჭიროა შესვლა'); return; }
     const msg = messages.find(m => m.id === messageId);
     if(!msg) return;
     ensureReactionStructure(msg);
@@ -484,58 +421,88 @@ audio.uploaded{display:block;margin-top:8px}
     msg.reactionCount = (msg.reactions || []).reduce((s,x)=>s + (x.count||0), 0);
     safeSave(LS_MESSAGES, messages);
     renderMessages();
+
+    // Update Firestore reactions for that message (merge)
+    if(FB){
+      const { db, collection, addDoc } = FB;
+      // Use Firestore update via RESTless approach: write reactions back by doc id
+      // We'll call a small helper exposed below to update reactions in Firestore
+      updateMessageReactionsInFirestore(messageId, msg.reactions).catch(e=>console.error(e));
+    }
   }
 
-  // Open reaction panel near message element
+  // Delete message (local + Firestore)
+  async function deleteMessage(messageId){
+    messages = messages.filter(m => m.id !== messageId);
+    safeSave(LS_MESSAGES, messages);
+    renderMessages();
+    if(FB){
+      try {
+        const { db } = FB;
+        // delete doc by id
+        // Firestore delete requires import of deleteDoc and doc; use dynamic import
+        const mod = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js");
+        const { doc, deleteDoc } = mod;
+        await deleteDoc(doc(db, 'chat_messages', messageId));
+      } catch(e){ console.error('Firestore delete error', e); }
+    }
+  }
+
+  // Update reactions in Firestore (merge)
+  async function updateMessageReactionsInFirestore(messageId, reactions){
+    if(!FB) return;
+    try {
+      const { db } = FB;
+      const mod = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js");
+      const { doc, updateDoc } = mod;
+      await updateDoc(doc(db, 'chat_messages', messageId), { reactions: reactions, reactionCount: reactions.reduce((s,x)=>s+(x.count||0),0) });
+    } catch(e){ console.error('update reactions error', e); }
+  }
+
+  // Reaction panel (quick set)
+  const QUICK_REACTIONS = ['👍','❤️','😂','😮','😢','🔥','🤩'];
+  const reactionPanelEl = document.createElement('div');
+  reactionPanelEl.style.position = 'fixed';
+  reactionPanelEl.style.zIndex = 2000;
+  reactionPanelEl.style.display = 'none';
+  reactionPanelEl.style.padding = '6px';
+  reactionPanelEl.style.borderRadius = '12px';
+  reactionPanelEl.style.background = 'rgba(10,12,18,0.96)';
+  reactionPanelEl.style.boxShadow = '0 12px 36px rgba(2,6,23,0.6)';
+  document.body.appendChild(reactionPanelEl);
+
   function openReactionPanelForMessage(messageEl, messageId){
-    if(!reactionPanel) return;
-    // build buttons
-    reactionPanel.innerHTML = '';
-    QUICK_REACTIONS.forEach(emoji => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = emoji;
-      btn.addEventListener('click', (ev)=>{
-        ev.stopPropagation();
-        toggleReaction(messageId, emoji);
-        closeReactionPanel();
-      });
-      reactionPanel.appendChild(btn);
+    reactionPanelEl.innerHTML = '';
+    QUICK_REACTIONS.forEach(emoji=>{
+      const b = document.createElement('button');
+      b.textContent = emoji;
+      b.style.fontSize = '20px';
+      b.style.margin = '4px';
+      b.style.padding = '6px';
+      b.style.border = '0';
+      b.style.background = 'transparent';
+      b.style.cursor = 'pointer';
+      b.addEventListener('click', (ev)=>{ ev.stopPropagation(); toggleReaction(messageId, emoji); closeReactionPanel(); });
+      reactionPanelEl.appendChild(b);
     });
-    // position
     const rect = messageEl.getBoundingClientRect();
     const panelW = Math.min(320, window.innerWidth - 24);
-    reactionPanel.style.width = panelW + 'px';
-    reactionPanel.style.display = 'flex';
-    // prefer above message if space, else below
-    const aboveTop = rect.top - 56;
-    if(aboveTop > 80){
-      reactionPanel.style.left = Math.max(8, rect.left + rect.width/2 - panelW/2) + 'px';
-      reactionPanel.style.top = (rect.top - 56) + 'px';
-    } else {
-      reactionPanel.style.left = Math.max(8, rect.left + rect.width/2 - panelW/2) + 'px';
-      reactionPanel.style.top = (rect.bottom + 8) + 'px';
-    }
-    // close on outside click
-    setTimeout(()=>{ document.addEventListener('click', outsideReactionClick); }, 10);
+    reactionPanelEl.style.width = panelW + 'px';
+    reactionPanelEl.style.left = Math.max(8, rect.left + rect.width/2 - panelW/2) + 'px';
+    const above = rect.top - 56;
+    if(above > 80) reactionPanelEl.style.top = (rect.top - 56) + 'px';
+    else reactionPanelEl.style.top = (rect.bottom + 8) + 'px';
+    reactionPanelEl.style.display = 'block';
+    setTimeout(()=> document.addEventListener('click', outsideReactionClick), 10);
   }
+  function closeReactionPanel(){ reactionPanelEl.style.display = 'none'; reactionPanelEl.innerHTML = ''; document.removeEventListener('click', outsideReactionClick); }
+  function outsideReactionClick(e){ if(!reactionPanelEl.contains(e.target)) closeReactionPanel(); }
 
-  function closeReactionPanel(){
-    if(!reactionPanel) return;
-    reactionPanel.style.display = 'none';
-    reactionPanel.innerHTML = '';
-    document.removeEventListener('click', outsideReactionClick);
-  }
-  function outsideReactionClick(e){
-    if(!reactionPanel) return;
-    if(!reactionPanel.contains(e.target)) closeReactionPanel();
-  }
-
-  // Open/close modals
+  // Modal helpers
   function openModal(modal){ if(!modal) return; modal.classList.remove('hidden'); const box = modal.querySelector('.box'); if(box) box.focus(); }
   function closeModal(modal){ if(!modal) return; modal.classList.add('hidden'); }
 
-  // Registration
+  // Registration handlers
   if(regAvatarBtn && regAvatarInput){
     regAvatarBtn.addEventListener('click', ()=> regAvatarInput.click());
     regAvatarInput.addEventListener('change', (e)=> {
@@ -647,15 +614,12 @@ audio.uploaded{display:block;margin-top:8px}
     });
   }
 
-  // Close view profile and reset collapse state
   if(closeViewProfile){
     closeViewProfile.addEventListener('click', ()=> { if(viewProfileModal) viewProfileModal.classList.remove('view-collapsed'); if(collapseViewBtn) collapseViewBtn.classList.remove('collapsed'); closeModal(viewProfileModal); });
   }
   if(viewProfileModal){
     viewProfileModal.addEventListener('click', (e)=> { if(e.target === viewProfileModal){ viewProfileModal.classList.remove('view-collapsed'); if(collapseViewBtn) collapseViewBtn.classList.remove('collapsed'); closeModal(viewProfileModal); }});
   }
-
-  // Collapse / expand view profile
   if(collapseViewBtn && viewProfileModal){
     collapseViewBtn.addEventListener('click', ()=> {
       const isCollapsed = collapseViewBtn.classList.toggle('collapsed');
@@ -684,38 +648,96 @@ audio.uploaded{display:block;margin-top:8px}
     });
   }
 
-  // Send message
-  function createMessageObject({text,file,userId}){
-    const id = uid('m'); const time = timeNow();
-    const msg = { id, text, userId, time, reactions: [], reactionCount: 0 };
-    if(file) msg.file = { name: file.name, type: file.type, data: file.data };
-    return msg;
-  }
-
-  function sendMessage(){
+  // Send message integrated with Firestore
+  async function sendMessage(){
     if(!currentUser){ alert('გთხოვთ შეხვიდეთ ან დარეგისტრირდეთ'); return; }
     const text = composerInput ? composerInput.value.trim() : '';
     if(!text && !pendingFile) return;
-    if(pendingFile && pendingFile instanceof File){
-      const r = new FileReader();
-      r.onload = ()=> {
-        const fileObj = { name: pendingFile.name, type: pendingFile.type, data: r.result };
-        const msg = createMessageObject({ text: text||'', file: fileObj, userId: currentUser.id });
-        messages.push(msg); safeSave(LS_MESSAGES, messages); if(composerInput) composerInput.value=''; pendingFile=null; if(pendingPreviewEl && pendingPreviewEl.parentNode) pendingPreviewEl.parentNode.removeChild(pendingPreviewEl); pendingPreviewEl=null; renderMessages();
-      };
-      r.readAsDataURL(pendingFile);
-    } else if(pendingFile && pendingFile.data){
-      const msg = createMessageObject({ text: text||'', file: pendingFile, userId: currentUser.id });
-      messages.push(msg); safeSave(LS_MESSAGES, messages); if(composerInput) composerInput.value=''; pendingFile=null; if(pendingPreviewEl && pendingPreviewEl.parentNode) pendingPreviewEl.parentNode.removeChild(pendingPreviewEl); pendingPreviewEl=null; renderMessages();
-    } else {
-      const msg = createMessageObject({ text: text||'', file:null, userId: currentUser.id });
-      messages.push(msg); safeSave(LS_MESSAGES, messages); if(composerInput) composerInput.value=''; renderMessages();
+    if(!FB){ // fallback local-only
+      const localMsg = createMessageObject({ text: text||'', file: pendingFile && pendingFile.data ? pendingFile : null, userId: currentUser.id });
+      messages.push(localMsg);
+      safeSave(LS_MESSAGES, messages);
+      if(composerInput) composerInput.value='';
+      if(pendingPreviewEl && pendingPreviewEl.parentNode) pendingPreviewEl.parentNode.removeChild(pendingPreviewEl);
+      pendingPreviewEl = null;
+      pendingFile = null;
+      renderMessages();
+      return;
     }
+
+    const { db, collection, addDoc, serverTimestamp } = FB;
+    const msgsCol = collection(db, 'chat_messages');
+
+    // If there's a File object, convert to dataURL first
+    if(pendingFile && pendingFile instanceof File){
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const fileObj = { name: pendingFile.name, type: pendingFile.type, data: reader.result };
+        try {
+          const docRef = await addDoc(msgsCol, {
+            text: text || '',
+            userId: currentUser.id,
+            file: fileObj,
+            createdAt: serverTimestamp(),
+            timeStr: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+            reactions: [],
+            reactionCount: 0
+          });
+          // optional: immediate local push using docRef.id
+          const localMsg = {
+            id: docRef.id,
+            text: text || '',
+            userId: currentUser.id,
+            time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+            file: fileObj,
+            reactions: [],
+            reactionCount: 0
+          };
+          messages.push(localMsg);
+          safeSave(LS_MESSAGES, messages);
+          renderMessages();
+        } catch(e){ console.error('Firestore addDoc error', e); alert('შეტყობინების გაგზავნა ვერ მოხერხდა'); }
+        if(composerInput) composerInput.value='';
+        pendingFile = null;
+        if(pendingPreviewEl && pendingPreviewEl.parentNode) pendingPreviewEl.parentNode.removeChild(pendingPreviewEl);
+        pendingPreviewEl = null;
+      };
+      reader.readAsDataURL(pendingFile);
+      return;
+    }
+
+    // No file or file already has data
+    try {
+      const docRef = await addDoc(msgsCol, {
+        text: text || '',
+        userId: currentUser.id,
+        file: null,
+        createdAt: serverTimestamp(),
+        timeStr: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+        reactions: [],
+        reactionCount: 0
+      });
+      // optional immediate local push
+      const localMsg = {
+        id: docRef.id,
+        text: text || '',
+        userId: currentUser.id,
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+        file: null,
+        reactions: [],
+        reactionCount: 0
+      };
+      messages.push(localMsg);
+      safeSave(LS_MESSAGES, messages);
+      renderMessages();
+    } catch(e){ console.error('Firestore addDoc error', e); alert('შეტყობინების გაგზავნა ვერ მოხერხდა'); }
+    if(composerInput) composerInput.value='';
   }
+
   if(sendBtn) sendBtn.addEventListener('click', sendMessage);
   if(composerInput) composerInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
 
-  // Recording
+  // Recording (same as before)
   if(recordBtn){
     recordBtn.addEventListener('click', async ()=>{
       if(isRecording){ if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); return; }
@@ -748,60 +770,78 @@ audio.uploaded{display:block;margin-top:8px}
           isRecording=false; recordBtn.classList.remove('recording'); recordBtn.setAttribute('aria-pressed','false'); recordBtn.textContent = '🎤';
         };
         mediaRecorder.start();
-        isRecording=true; recordBtn.classList.add('recording'); recordBtn.setAttribute('aria-pressed','true'); recordBtn.textContent = '⏹️';
+        isRecording=true; recordBtn.classList.add('recording'); recordBtn.setAttribute('aria-pressed','true'); recordBtn.textContent='⏹️';
       } catch(err){ console.error('getUserMedia error', err); alert('მიკროფონის გამოყენება შეუძლებელია: ' + (err && err.message ? err.message : '')); isRecording=false; }
     });
   }
 
-  // Theme toggle (fixed)
-  function applyTheme(t){
-    if(t === 'light') document.body.classList.add('light'); else document.body.classList.remove('light');
-    safeSave(LS_THEME, t);
-    updateThemeIcon(t);
+  // Firestore realtime listener setup
+  let knownIds = new Set();
+  if(FB){
+    const { db, collection, onSnapshot, query, orderBy } = FB;
+    const msgsCol = collection(db, 'chat_messages');
+    const q = query(msgsCol, orderBy('createdAt', 'asc'));
+
+    onSnapshot(q, (snapshot) => {
+      let changed = false;
+      snapshot.docChanges().forEach(change => {
+        const doc = change.doc;
+        const data = doc.data();
+        const mid = doc.id;
+        if(change.type === 'removed'){
+          // remove locally if exists
+          const idx = messages.findIndex(m => m.id === mid);
+          if(idx !== -1){ messages.splice(idx,1); knownIds.delete(mid); changed = true; }
+          return;
+        }
+        if(!knownIds.has(mid)){
+          const msg = {
+            id: mid,
+            text: data.text || '',
+            userId: data.userId || 'unknown',
+            time: data.timeStr || (data.createdAt && data.createdAt.toDate ? data.createdAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''),
+            file: data.file || null,
+            reactions: data.reactions || [],
+            reactionCount: data.reactionCount || 0
+          };
+          messages.push(msg);
+          knownIds.add(mid);
+          changed = true;
+        } else {
+          // update existing (e.g., reactions changed)
+          const idx = messages.findIndex(m => m.id === mid);
+          if(idx !== -1){
+            messages[idx].reactions = data.reactions || [];
+            messages[idx].reactionCount = data.reactionCount || 0;
+            changed = true;
+          }
+        }
+      });
+      if(changed){
+        safeSave(LS_MESSAGES, messages);
+        renderMessages();
+      }
+    }, (err) => {
+      console.error('Firestore onSnapshot error', err);
+    });
+  } else {
+    // If Firestore not available, load local messages
+    messages = safeLoad(LS_MESSAGES) || [];
+    messages.forEach(m => knownIds.add(m.id));
   }
-  function updateThemeIcon(t){
-    if(!themeIcon) return;
-    // simple icon swap: moon for dark, sun for light
-    if(t === 'light'){
-      themeIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="5" stroke="#f59e0b" stroke-width="1.4"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="#f59e0b" stroke-width="1.2" stroke-linecap="round"/></svg>';
-    } else {
-      themeIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="#06b6d4" opacity="0.12"/><path d="M21 12.79A9 9 0 1111.21 3" stroke="#06b6d4" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    }
-  }
-  // initialize theme
+
+  // Theme toggle
+  function applyTheme(t){ if(t==='light') document.body.classList.add('light'); else document.body.classList.remove('light'); safeSave(LS_THEME, t); }
   applyTheme(safeLoad(LS_THEME) || 'dark');
   if(themeToggle) themeToggle.addEventListener('click', ()=> applyTheme(document.body.classList.contains('light') ? 'dark' : 'light'));
 
-  // Reactions: close panel on scroll/resize
-  window.addEventListener('scroll', ()=> closeReactionPanel(), true);
-  window.addEventListener('resize', ()=> closeReactionPanel());
-
-  // Reaction panel close on Escape
-  document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeReactionPanel(); });
-
-  // View profile collapse behavior already wired above
-
-  // Utilities: compute age
-  function computeAge(year){
-    if(!year) return '--';
-    const y = parseInt(year,10);
-    if(!y || isNaN(y)) return '--';
-    const now = new Date();
-    let age = now.getFullYear() - y;
-    // rough: not checking month/day
-    return age;
+  // Utilities
+  function createMessageObject({text,file,userId}){
+    return { id: uid('m'), text, userId, time: timeNow(), file: file ? (file.data ? file : { name: file.name, type: file.type, data: file.data }) : null, reactions: [], reactionCount: 0 };
   }
+  function computeAge(year){ if(!year) return '--'; const y = parseInt(year,10); if(!y || isNaN(y)) return '--'; return new Date().getFullYear() - y; }
 
-  // Save/load helpers
-  function saveAll(){ safeSave(LS_USERS, users); safeSave(LS_MESSAGES, messages); safeSave(LS_CURRENT, currentUser); }
-
-  // Initial render
-  try { initDemo(); } catch(e){ console.error(e); }
-  try { updateAuthUI(); } catch(e){}
-  try { renderUsers(); } catch(e){}
-  try { renderMessages(); } catch(e){}
-
-  // small helper: update header auth UI
+  // Update header auth UI
   function updateAuthUI(){
     if(!statusText) return;
     if(currentUser){
@@ -821,8 +861,14 @@ audio.uploaded{display:block;margin-top:8px}
     }
   }
 
+  // Initial setup
+  try { initDemoUsers(); } catch(e){ console.error(e); }
+  try { updateAuthUI(); } catch(e){}
+  try { renderUsers(); } catch(e){}
+  try { renderMessages(); } catch(e){}
+
   // Expose for debug
-  window._chat = { users, messages, currentUser, toggleReaction };
+  window._chat = { users, messages, currentUser };
 
 })(); // end IIFE
 </script>
