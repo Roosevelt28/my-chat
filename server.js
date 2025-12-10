@@ -1,3 +1,4 @@
+// server.js — modified: session shared with Socket.IO, DB-backed message IDs, initMessages on connect
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -83,11 +84,20 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'change_this_secret';
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(session({
+
+// --- session middleware (shared between express and socket.io)
+const sessionMiddleware = session({
   secret: SESSION_SECRET,
   resave: false,
-  saveUninitialized: false
-}));
+  saveUninitialized: false,
+  cookie: { secure: false } // set true in production with HTTPS
+});
+app.use(sessionMiddleware);
+
+// make session available to socket.io
+io.use((socket, next) => {
+  sessionMiddleware(socket.request, socket.request.res || {}, next);
+});
 
 app.use(express.static(path.join(APP_DIR, 'public')));
 app.use('/uploads', express.static(UPLOADS));
@@ -120,6 +130,7 @@ app.post('/api/register', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(username, hash, first_name || null, last_name || null, nickname || null, email || null, age ? Number(age) : null);
     req.session.userId = info.lastInsertRowid;
+    req.session.username = username;
     return res.json({ ok: true, userId: info.lastInsertRowid, username });
   } catch (e) {
     return res.status(400).json({ error: 'Username taken or invalid data' });
@@ -133,6 +144,7 @@ app.post('/api/login', (req, res) => {
   if (row.blocked) return res.status(403).json({ error: 'User is blocked' });
   if (!bcrypt.compareSync(password, row.password)) return res.status(401).json({ error: 'Invalid credentials' });
   req.session.userId = row.id;
+  req.session.username = username;
   res.json({ ok: true, userId: row.id, username });
 });
 
@@ -311,15 +323,55 @@ function broadcastOnline() {
 }
 
 io.on('connection', socket => {
+  // attach session userId automatically if present
+  try {
+    const sess = socket.request.session;
+    if (sess && sess.userId) {
+      socket.userId = sess.userId;
+      socket.username = sess.username || null;
+      if (!socketsByUser.has(socket.userId)) socketsByUser.set(socket.userId, new Set());
+      socketsByUser.get(socket.userId).add(socket.id);
+    } else {
+      // fallback: anonymous username (client can still send 'identify' later)
+      socket.username = `Guest${Math.floor(Math.random()*9000)}`;
+    }
+  } catch (e) {
+    console.warn('session attach error', e);
+  }
+
   onlineSockets.add(socket.id);
   broadcastOnline();
 
+  // send recent public messages to this socket (init)
+  try {
+    const rows = db.prepare(`
+      SELECT id, from_user, to_user, text, media_type, media_url, ts
+      FROM messages
+      WHERE to_user IS NULL
+      ORDER BY ts DESC
+      LIMIT 200
+    `).all();
+    // send in chronological order
+    socket.emit('initMessages', rows.reverse());
+  } catch (e) {
+    console.error('initMessages error', e);
+  }
+
   socket.on('identify', ({ userId, username }) => {
-    socket.userId = userId || null;
-    socket.username = username || `User${Math.floor(Math.random()*9000)}`;
+    // fallback identification for clients without session cookie
+    socket.userId = userId || socket.userId || null;
+    socket.username = username || socket.username || `Guest${Math.floor(Math.random()*9000)}`;
     if (socket.userId) {
       if (!socketsByUser.has(socket.userId)) socketsByUser.set(socket.userId, new Set());
       socketsByUser.get(socket.userId).add(socket.id);
+      // persist to session if available
+      try {
+        if (socket.request && socket.request.session) {
+          socket.request.session.userId = socket.userId;
+          socket.request.session.username = socket.username;
+          socket.request.session.save && socket.request.session.save();
+        }
+      } catch(e) { /* ignore */ }
     }
     const users = db.prepare('SELECT id, username, avatar FROM users').all();
     io.emit('users', users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar })));
@@ -336,19 +388,26 @@ io.on('connection', socket => {
         return;
       }
     }
-    const fromUser = socket.userId ? getUserById(socket.userId) : { username: socket.username };
+    const fromUserId = socket.userId || null;
+    const username = socket.userId ? (getUserById(socket.userId) || {}).username : socket.username;
+    const ts = Date.now();
+
+    // insert into DB and get row id
+    const info = db.prepare('INSERT INTO messages (from_user, to_user, text, media_type, media_url, ts) VALUES (?, ?, ?, ?, ?, ?)').run(
+      fromUserId, null, text || '', media ? media.type : null, media ? media.url : null, ts
+    );
+    const dbId = info.lastInsertRowid;
+
     const msg = {
-      id: uuidv4(),
-      from_user: socket.userId || null,
-      username: fromUser.username,
+      id: dbId,
+      from_user: fromUserId,
+      username: username,
       to_user: null,
       text: text || '',
       media_type: media ? media.type : null,
       media_url: media ? media.url : null,
-      ts: Date.now()
+      ts
     };
-    db.prepare('INSERT INTO messages (from_user, to_user, text, media_type, media_url, ts) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(msg.from_user, null, msg.text, msg.media_type, msg.media_url, msg.ts);
     io.emit('message', msg);
   });
 
@@ -380,19 +439,22 @@ io.on('connection', socket => {
       return;
     }
 
+    const ts = Date.now();
+    const info = db.prepare('INSERT INTO messages (from_user, to_user, text, media_type, media_url, ts) VALUES (?, ?, ?, ?, ?, ?)').run(
+      socket.userId || null, toUser.id, text || '', media ? media.type : null, media ? media.url : null, ts
+    );
+    const dbId = info.lastInsertRowid;
+
     const msg = {
-      id: uuidv4(),
+      id: dbId,
       from_user: socket.userId || null,
       username: fromName,
       to_user: toUser.id,
       text: text || '',
       media_type: media ? media.type : null,
       media_url: media ? media.url : null,
-      ts: Date.now()
+      ts
     };
-    db.prepare('INSERT INTO messages (from_user, to_user, text, media_type, media_url, ts) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(msg.from_user, msg.to_user, msg.text, msg.media_type, msg.media_url, msg.ts);
-
     const set = socketsByUser.get(toUser.id);
     if (set) { for (const sid of set) io.to(sid).emit('privateMessage', msg); }
     socket.emit('privateMessage', msg);
@@ -454,4 +516,3 @@ io.on('connection', socket => {
 // Start
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-
