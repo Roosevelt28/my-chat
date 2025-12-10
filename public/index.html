@@ -3,25 +3,25 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>ChatApp — Firestore Realtime</title>
+<title>Realtime Chat — Socket.IO</title>
 <style>
-:root{--bg:#071024;--panel:rgba(255,255,255,0.02);--accent:#06b6d4;--muted:#94a3b8;--text:#e6eef6}
-*{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,Helvetica;background:linear-gradient(180deg,var(--bg),#071a2a);color:var(--text);-webkit-font-smoothing:antialiased}
+:root{--bg:#071024;--panel:rgba(255,255,255,0.03);--accent:#06b6d4;--muted:#94a3b8;--text:#e6eef6}
+*{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,Helvetica;background:linear-gradient(180deg,var(--bg),#071a2a);color:var(--text)}
 .container{max-width:980px;margin:18px auto;padding:12px;display:grid;grid-template-columns:1fr 320px;gap:12px}
 .panel{background:var(--panel);padding:12px;border-radius:10px;overflow:hidden}
 .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .brand{font-weight:700;color:var(--accent)}
-.messages{height:64vh;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.small{font-size:13px;color:var(--muted)}
+.messages{height:60vh;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,0.02);border-radius:10px}
 .msg{max-width:78%;padding:10px;border-radius:12px;box-shadow:0 8px 20px rgba(2,6,23,0.4)}
 .me{align-self:flex-end;background:linear-gradient(90deg,#0ea5a4,#0891b2);color:#042027}
-.other{align-self:flex-start;background:rgba(255,255,255,0.03);color:var(--muted)}
+.other{align-self:flex-start;background:rgba(255,255,255,0.06);color:#dde7f3}
 .meta{font-size:12px;color:var(--muted);margin-top:6px;text-align:right}
-.composer{display:flex;gap:8px;padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
-.input{flex:1;padding:12px;border-radius:10px;border:0;background:rgba(255,255,255,0.02);color:inherit}
+.composer{display:flex;gap:8px;padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent)}
+.input, .input-small{flex:1;padding:12px;border-radius:10px;border:0;background:rgba(255,255,255,0.04);color:inherit}
 .send{background:var(--accent);border:0;padding:10px 14px;border-radius:10px;color:#042027;font-weight:700;cursor:pointer}
 .users{padding:8px;display:flex;flex-direction:column;gap:8px}
-.user{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:rgba(255,255,255,0.01)}
-.small{font-size:13px;color:var(--muted)}
+.user{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:rgba(255,255,255,0.04);cursor:pointer}
 @media (max-width:900px){.container{grid-template-columns:1fr;padding:8px}.messages{height:56vh}}
 </style>
 </head>
@@ -30,211 +30,149 @@
   <div class="panel">
     <div class="header">
       <div>
-        <div class="brand">ChatApp</div>
-        <div id="status" class="small">დაკავშირება: უცნობი</div>
+        <div class="brand">Chat</div>
+        <div id="status" class="small">დაკავშირება: —</div>
       </div>
-      <div>
-        <button id="loginBtn" class="small">შესვლა</button>
-        <button id="logoutBtn" class="small" style="display:none">გასვლა</button>
+      <div style="display:flex;gap:8px">
+        <input id="nick" class="input-small" placeholder="ნიკი" style="max-width:200px" />
+        <button id="login" class="send">შესვლა</button>
+        <button id="logout" class="send" style="display:none">გასვლა</button>
       </div>
     </div>
 
     <div id="messages" class="messages" aria-live="polite"></div>
 
-    <div class="composer" role="region" aria-label="შეტყობინების შემქმნელი">
-      <input id="textInput" class="input" placeholder="დაწერეთ შეტყობინება..." />
-      <button id="sendBtn" class="send">გაგზავნა</button>
+    <div class="composer" role="region" aria-label="საჯარო შეტყობინება">
+      <input id="text" class="input" placeholder="საჯარო შეტყობინება..." />
+      <button id="send" class="send">გაგზავნა</button>
+    </div>
+
+    <div class="composer" role="region" aria-label="პირადი შეტყობინება">
+      <input id="toUser" class="input" placeholder="მიმღები ნიკი (პირადი)" />
+      <input id="pmText" class="input" placeholder="პირადი შეტყობინება..." />
+      <button id="sendPm" class="send">PM</button>
     </div>
   </div>
 
   <aside class="panel">
-    <h4 style="margin:0 0 8px 0">მომხმარებლები</h4>
-    <div id="users" class="users"></div>
-    <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)" />
-    <div>
-      <div class="small">რეგისტრაცია / შესვლა (დემო)</div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <input id="nickInput" placeholder="ნიკი" style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
-        <button id="demoLogin" class="small">შესვლა</button>
-      </div>
-      <div id="meInfo" style="margin-top:10px" class="small"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h4 style="margin:0">მომხმარებლები</h4>
+      <div class="small">ონლაინ: <span id="onlineCount">0</span></div>
     </div>
+    <div id="users" class="users"></div>
   </aside>
 </div>
 
-<!-- Firebase SDK (modular) -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-  // --- REPLACE with your Firebase config ---
-  const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID"
-    // storageBucket, messagingSenderId, appId optional
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // App state
-  const LS_USER = 'chat_demo_user';
-  let currentUser = JSON.parse(localStorage.getItem(LS_USER) || 'null');
-  const msgsCol = collection(db, 'chat_messages');
-  const q = query(msgsCol, orderBy('createdAt', 'asc'));
-
-  // DOM
+<script src="/socket.io/socket.io.js"></script>
+<script>
   const statusEl = document.getElementById('status');
   const messagesEl = document.getElementById('messages');
   const usersEl = document.getElementById('users');
-  const textInput = document.getElementById('textInput');
-  const sendBtn = document.getElementById('sendBtn');
-  const demoLogin = document.getElementById('demoLogin');
-  const nickInput = document.getElementById('nickInput');
-  const meInfo = document.getElementById('meInfo');
-  const loginBtn = document.getElementById('loginBtn');
-  const logoutBtn = document.getElementById('logoutBtn');
+  const onlineCountEl = document.getElementById('onlineCount');
 
-  // Helpers
-  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function timeStr(ts){ try{ return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }catch(e){return ''} }
-  function renderMessage(m){
+  const nickEl = document.getElementById('nick');
+  const loginBtn = document.getElementById('login');
+  const logoutBtn = document.getElementById('logout');
+
+  const textEl = document.getElementById('text');
+  const sendBtn = document.getElementById('send');
+
+  const toUserEl = document.getElementById('toUser');
+  const pmTextEl = document.getElementById('pmText');
+  const sendPmBtn = document.getElementById('sendPm');
+
+  // Socket.IO client with cookies
+  const socket = io({ withCredentials: true });
+
+  function renderMessage(m) {
+    const mine = m.userId && window._me && m.userId === window._me.id;
     const el = document.createElement('div');
-    el.className = 'msg ' + ((currentUser && currentUser.id === m.userId) ? 'me' : 'other');
-    el.innerHTML = `<div><strong>${escapeHtml(m.username||'Anon')}</strong></div><div style="margin-top:6px">${escapeHtml(m.text||'')}</div><div class="meta">${timeStr(m.createdAt?.seconds ? m.createdAt.seconds*1000 : (m.createdAt||m.ts)||Date.now())}</div>`;
+    el.className = 'msg ' + (mine ? 'me' : 'other');
+    el.innerHTML = `<div><strong>${escapeHtml(m.username || m.fromUsername || 'Anon')}</strong></div>
+                    <div style="margin-top:6px">${escapeHtml(m.text || '')}</div>
+                    <div class="meta">${new Date(m.ts || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
     messagesEl.appendChild(el);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  function setStatus(s){ statusEl.textContent = 'დაკავშირება: ' + s; }
-
-  // Auth (demo local)
-  function setCurrentUser(u){
-    currentUser = u;
-    if(u){
-      localStorage.setItem(LS_USER, JSON.stringify(u));
-      meInfo.textContent = `შენ: ${u.username}`;
-      loginBtn.style.display = 'none';
-      logoutBtn.style.display = 'inline-block';
-    } else {
-      localStorage.removeItem(LS_USER);
-      meInfo.textContent = '';
-      loginBtn.style.display = 'inline-block';
-      logoutBtn.style.display = 'none';
-    }
-  }
-  // init
-  setCurrentUser(currentUser);
-
-  // Firestore realtime listener
-  let unsubscribe = null;
-  try {
-    unsubscribe = onSnapshot(q, (snapshot) => {
-      messagesEl.innerHTML = '';
-      const msgs = [];
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        msgs.push({ id: docSnap.id, ...data });
-      });
-      // render
-      msgs.forEach(renderMessage);
-      setStatus('online (Firestore)');
-    }, (err) => {
-      console.error('onSnapshot error', err);
-      setStatus('error');
-    });
-  } catch (e) {
-    console.error('Firestore init error', e);
-    setStatus('not connected');
-  }
-
-  // Send message
-  async function sendMessage(){
-    const text = textInput.value.trim();
-    if(!text) return;
-    const payload = {
-      text,
-      username: currentUser ? currentUser.username : 'Guest',
-      userId: currentUser ? currentUser.id : null,
-      createdAt: serverTimestamp(),
-      reactions: []
-    };
-    try {
-      await addDoc(msgsCol, payload);
-      textInput.value = '';
-    } catch (e) {
-      console.error('send error', e);
-      alert('შეტყობინების გაგზავნა ვერ მოხერხდა');
-    }
-  }
-
-  sendBtn.addEventListener('click', sendMessage);
-  textInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
-
-  // Demo login (local only) — creates a simple client identity used for messages
-  demoLogin.addEventListener('click', ()=>{
-    const nick = (nickInput.value || '').trim();
-    if(!nick){ alert('შეიყვანე ნიკი'); return; }
-    // create a simple id
-    const id = 'u_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-    setCurrentUser({ id, username: nick });
-    nickInput.value = '';
+  socket.on('connect', () => {
+    statusEl.textContent = 'დაკავშირება: connected';
+  });
+  socket.on('disconnect', () => {
+    statusEl.textContent = 'დაკავშირება: disconnected';
   });
 
-  // Simple logout
-  logoutBtn.addEventListener('click', ()=> setCurrentUser(null));
-
-  // Login button opens demo login input focus
-  loginBtn.addEventListener('click', ()=> nickInput.focus());
-
-  // Users list: derive from recent messages (simple)
-  // Update users list whenever snapshot changes
-  function updateUsersFromSnapshot(snapshot){
-    const map = new Map();
-    snapshot.forEach(docSnap => {
-      const d = docSnap.data();
-      if(d && d.userId){
-        map.set(d.userId, { id: d.userId, username: d.username });
-      }
-    });
+  socket.on('message', (m) => renderMessage(m));
+  socket.on('privateMessage', (m) => renderMessage(m));
+  socket.on('onlineCount', ({ count }) => onlineCountEl.textContent = count);
+  socket.on('users', (list) => {
     usersEl.innerHTML = '';
-    for(const u of map.values()){
+    list.forEach(u => {
       const div = document.createElement('div');
       div.className = 'user';
-      div.innerHTML = `<div><strong>${escapeHtml(u.username)}</strong></div><div class="small">id:${escapeHtml(u.id)}</div>`;
+      div.innerHTML = `<div><strong>${escapeHtml(u.username)}</strong></div><div class="small">${escapeHtml(u.id)}</div>`;
+      div.addEventListener('click', () => { toUserEl.value = u.username; });
       usersEl.appendChild(div);
-    }
-  }
-
-  // Re-attach a snapshot listener that also updates users list
-  // (we already have unsubscribe; create a combined listener)
-  try {
-    // detach previous
-    if(typeof unsubscribe === 'function') unsubscribe();
-    const q2 = query(msgsCol, orderBy('createdAt', 'asc'));
-    const unsub2 = onSnapshot(q2, (snapshot) => {
-      messagesEl.innerHTML = '';
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        renderMessage({ id: docSnap.id, ...data });
-      });
-      updateUsersFromSnapshot(snapshot);
-      setStatus('online (Firestore)');
-    }, (err) => {
-      console.error('onSnapshot error', err);
-      setStatus('error');
     });
-    // keep reference
-    unsubscribe = unsub2;
-  } catch(e){
-    console.error('listener error', e);
-    setStatus('not connected');
-  }
+  });
 
-  // Optional: expose send for console testing
-  window._chat = { sendMessage, db };
+  // Login via API
+  loginBtn.addEventListener('click', async () => {
+    const nick = (nickEl.value || '').trim();
+    if (!nick) { alert('შეიყვანე ნიკი'); return; }
+    try {
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ nickname: nick })
+      });
+      const data = await r.json();
+      if (!data.ok) { alert(data.error || 'შესვლის შეცდომა'); return; }
+      window._me = { id: data.userId, username: data.username };
+      loginBtn.style.display = 'none';
+      logoutBtn.style.display = 'inline-block';
+      statusEl.textContent = 'დაკავშირება: connected (' + data.username + ')';
+      // optional: inform server in case session attach delays
+      socket.emit('identify', { userId: window._me.id, username: window._me.username });
+    } catch (e) {
+      alert('შესვლის შეცდომა');
+    }
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+      window._me = null;
+      loginBtn.style.display = 'inline-block';
+      logoutBtn.style.display = 'none';
+      statusEl.textContent = 'დაკავშირება: connected (Guest)';
+    } catch (e) {}
+  });
+
+  // Send public
+  sendBtn.addEventListener('click', () => {
+    const text = (textEl.value || '').trim();
+    if (!text) return;
+    socket.emit('chatMessage', { text });
+    textEl.value = '';
+  });
+  textEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
+  });
+
+  // Send private
+  sendPmBtn.addEventListener('click', () => {
+    const to = (toUserEl.value || '').trim();
+    const text = (pmTextEl.value || '').trim();
+    if (!to || !text) return;
+    socket.emit('privateMessage', { toUsername: to, text });
+    pmTextEl.value = '';
+  });
+  pmTextEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendPmBtn.click(); }
+  });
 </script>
 </body>
 </html>
