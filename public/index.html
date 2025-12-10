@@ -3,874 +3,238 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>ChatApp — Realtime (Firestore) — სრული ვერსია</title>
+<title>ChatApp — Firestore Realtime</title>
 <style>
-:root{
-  --bg-dark-1:#071024; --bg-dark-2:#071a2a;
-  --panel-dark:rgba(255,255,255,0.02);
-  --accent:#06b6d4; --muted:#94a3b8; --text-dark:#e6eef6;
-  --radius:12px;
-}
-*{box-sizing:border-box}
-html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,Helvetica;-webkit-font-smoothing:antialiased}
-body{background:linear-gradient(180deg,var(--bg-dark-1),var(--bg-dark-2));color:var(--text-dark)}
-body.light{background:#fff;color:#0b1220}
-.app{display:grid;grid-template-columns:1fr 320px;height:100vh;padding:12px;gap:12px}
-.left-col{display:flex;flex-direction:column;border-radius:10px;background:var(--panel-dark);overflow:hidden;min-width:0}
-.header-left{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid rgba(255,255,255,0.03)}
-body.light .header-left{border-bottom-color:rgba(2,6,23,0.06)}
+:root{--bg:#071024;--panel:rgba(255,255,255,0.02);--accent:#06b6d4;--muted:#94a3b8;--text:#e6eef6}
+*{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,Helvetica;background:linear-gradient(180deg,var(--bg),#071a2a);color:var(--text);-webkit-font-smoothing:antialiased}
+.container{max-width:980px;margin:18px auto;padding:12px;display:grid;grid-template-columns:1fr 320px;gap:12px}
+.panel{background:var(--panel);padding:12px;border-radius:10px;overflow:hidden}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .brand{font-weight:700;color:var(--accent)}
-.online-indicator{font-size:13px;color:var(--muted)}
-.messages{flex:1;padding:12px;overflow:auto;display:flex;flex-direction:column;gap:10px;position:relative;-webkit-overflow-scrolling:touch}
-.message{max-width:80%;padding:10px;border-radius:12px; position: relative; z-index:1; word-break:break-word; display:block; box-shadow: 0 6px 18px rgba(2,6,23,0.18);}
+.messages{height:64vh;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:78%;padding:10px;border-radius:12px;box-shadow:0 8px 20px rgba(2,6,23,0.4)}
 .me{align-self:flex-end;background:linear-gradient(90deg,#0ea5a4,#0891b2);color:#042027}
 .other{align-self:flex-start;background:rgba(255,255,255,0.03);color:var(--muted)}
-body.light .other{background:rgba(2,6,23,0.04);color:#0b1220}
-.msg-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.msg-header img{width:28px;height:28px;border-radius:50%;object-fit:cover}
-.msg-author{font-weight:700;font-size:13px}
-.meta{font-size:11px;opacity:0.9;margin-top:6px;text-align:right}
-.composer{display:flex;gap:8px;padding:12px;border-top:1px solid rgba(255,255,255,0.02);align-items:center;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);position:sticky;bottom:0;left:0;right:0;backdrop-filter: blur(6px);z-index:1400;padding-bottom: calc(env(safe-area-inset-bottom) + 12px);}
-.left-group{display:flex;gap:8px;align-items:center}
-.input{flex:1;min-width:0;padding:12px 14px;border-radius:10px;border:0;background:rgba(255,255,255,0.02);color:inherit;font-size:16px;height:48px;line-height:20px}
-body.light .input{background:rgba(2,6,23,0.04);color:#0b1220}
-.icon-btn{width:44px;height:44px;border-radius:10px;border:0;background:rgba(255,255,255,0.03);display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
-body.light .icon-btn{background:rgba(2,6,23,0.03);color:#0b1220}
-.send-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;background:var(--accent);border:0;border-radius:10px;color:#042027;cursor:pointer;font-weight:700;min-height:44px;min-width:64px;justify-content:center}
-.users-list{padding:12px;background:rgba(255,255,255,0.01);border-radius:8px;overflow:auto}
-.user-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:6px;cursor:pointer}
-.user-item img{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-right:8px}
-.modal{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:3000}
-.modal.hidden{display:none}
-.modal .box{background:#071a2a;padding:16px;border-radius:8px;min-width:320px;color:var(--text-dark);position:relative;max-height:calc(100vh - 48px);overflow:auto;width:520px;max-width:calc(100% - 48px)}
-body.light .modal .box{background:#fff;color:#0b1220}
-.close{position:absolute;right:12px;top:8px;background:transparent;border:0;color:var(--muted);cursor:pointer}
-.avatar-large{width:96px;height:96px;border-radius:50%;object-fit:cover}
-.reaction-list{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
-.reaction-item{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);cursor:pointer}
-.reaction-item.active{background:rgba(6,182,212,0.12);border-color:rgba(6,182,212,0.18);color:#06b6d4}
-.btn-delete{background:transparent;border:1px solid rgba(255,255,255,0.04);color:#ffb4b4;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px}
-.record-btn{width:48px;height:48px;border-radius:12px;border:0;background:linear-gradient(180deg,#06b6d4,#0284a2);color:#042027;display:inline-flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:transform .08s ease}
-.record-btn.recording{background:linear-gradient(180deg,#ff3b3b,#c40000);box-shadow:0 8px 24px rgba(196,0,0,0.12);transform:scale(1.02)}
-#viewProfileModal.view-collapsed .box{max-height:64px;overflow:hidden;transition:max-height 220ms ease}
-@media (max-width:900px){
-  .app{grid-template-columns:1fr;padding:8px;height:100vh}
-  .right-col{display:none}
-  .messages{padding:10px 6px;gap:8px}
-  .message{max-width:92%}
-  .composer{padding:10px;gap:6px}
-  .input{height:52px;padding:12px 12px;font-size:16px;border-radius:12px}
-  .icon-btn{width:48px;height:48px;border-radius:12px}
-  .send-btn{min-width:56px;padding:10px 12px;border-radius:12px}
-  .modal .box{width:calc(100% - 24px);max-height:calc(100vh - 24px);margin:12px}
-  .avatar-large{width:72px;height:72px}
-}
+.meta{font-size:12px;color:var(--muted);margin-top:6px;text-align:right}
+.composer{display:flex;gap:8px;padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
+.input{flex:1;padding:12px;border-radius:10px;border:0;background:rgba(255,255,255,0.02);color:inherit}
+.send{background:var(--accent);border:0;padding:10px 14px;border-radius:10px;color:#042027;font-weight:700;cursor:pointer}
+.users{padding:8px;display:flex;flex-direction:column;gap:8px}
+.user{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:rgba(255,255,255,0.01)}
+.small{font-size:13px;color:var(--muted)}
+@media (max-width:900px){.container{grid-template-columns:1fr;padding:8px}.messages{height:56vh}}
 </style>
 </head>
 <body>
-<div class="app" id="appRoot">
-  <div class="left-col" role="main" aria-label="ჩატი">
-    <div class="header-left">
+<div class="container">
+  <div class="panel">
+    <div class="header">
       <div>
         <div class="brand">ChatApp</div>
-        <div class="online-indicator" id="statusText">გთხოვთ შეხვიდეთ ან დარეგისტრირდეთ</div>
+        <div id="status" class="small">დაკავშირება: უცნობი</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button id="themeToggle" class="icon-btn" title="თემის გადართვა" aria-label="თემა">🌓</button>
-        <button id="loginHeaderBtn" class="icon-btn" title="შესვლა" aria-label="შესვლა">🔐</button>
-        <button id="openRegisterBtn" class="icon-btn" title="რეგისტრაცია" aria-label="რეგისტრაცია">✍️</button>
-        <button id="openProfileBtn" class="icon-btn" title="პროფილი" aria-label="პროფილი" style="display:none">👤</button>
-        <button id="logoutBtn" class="icon-btn" title="გასვლა" aria-label="გასვლა" style="display:none">⎋</button>
+      <div>
+        <button id="loginBtn" class="small">შესვლა</button>
+        <button id="logoutBtn" class="small" style="display:none">გასვლა</button>
       </div>
     </div>
 
-    <div class="messages" id="messages" tabindex="0" aria-live="polite"></div>
+    <div id="messages" class="messages" aria-live="polite"></div>
 
     <div class="composer" role="region" aria-label="შეტყობინების შემქმნელი">
-      <div class="left-group">
-        <label title="ატვირთვა">
-          <input id="fileInput" type="file" accept="image/*,audio/*" style="display:none" />
-          <button id="attachBtn" class="icon-btn" aria-label="ატვირთვა" title="ატვირთვა">📎</button>
-        </label>
-        <button id="recordBtn" class="record-btn" title="ჩაწერე ხმოვანი" aria-pressed="false" aria-label="ჩაწერა">🎤</button>
-      </div>
-
-      <input id="composerInput" class="input" type="text" placeholder="დაწერეთ შეტყობინება..." aria-label="შეტყობინების ტექსტი" />
-      <button id="sendBtn" class="send-btn" aria-label="გაგზავნა">გაგზავნა</button>
+      <input id="textInput" class="input" placeholder="დაწერეთ შეტყობინება..." />
+      <button id="sendBtn" class="send">გაგზავნა</button>
     </div>
   </div>
 
-  <aside class="right-col" aria-label="მომხმარებლები">
-    <div style="display:flex;gap:8px;align-items:center;padding:12px">
-      <input id="searchUsers" placeholder="ძიება" style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.01)" />
-      <button id="openRegisterBtn2" class="icon-btn" title="რეგისტრაცია">✍️</button>
+  <aside class="panel">
+    <h4 style="margin:0 0 8px 0">მომხმარებლები</h4>
+    <div id="users" class="users"></div>
+    <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)" />
+    <div>
+      <div class="small">რეგისტრაცია / შესვლა (დემო)</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="nickInput" placeholder="ნიკი" style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
+        <button id="demoLogin" class="small">შესვლა</button>
+      </div>
+      <div id="meInfo" style="margin-top:10px" class="small"></div>
     </div>
-    <div class="users-list" id="usersList"></div>
   </aside>
 </div>
 
-<!-- Profile modal -->
-<div class="modal hidden" id="profileModal" role="dialog" aria-modal="true">
-  <div class="box" tabindex="0">
-    <button class="close" id="closeProfile">✕</button>
-    <h3>პროფილი</h3>
-    <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
-      <img id="profileAvatar" class="avatar-large" src="https://picsum.photos/96" alt="პროფილი" />
-      <div>
-        <div id="profileFullName" style="font-weight:700">სახელი გვარი</div>
-        <div id="profileNickname" style="color:var(--muted);margin-top:6px">@ნიკნეიმი</div>
-      </div>
-    </div>
-    <div style="margin-top:12px" class="small">დაბ. წელი: <span id="profileYear">----</span> • ასაკი: <span id="profileAge">--</span></div>
-    <div style="margin-top:12px;display:flex;gap:8px">
-      <input id="avatarUploadInput" type="file" accept="image/*" style="display:none" />
-      <button id="changeAvatarBtn" class="send-btn">ავატარის შეცვლა</button>
-      <button id="editProfileBtn" class="icon-btn">✎</button>
-      <button id="closeProfileBtn" class="send-btn">დახურვა</button>
-    </div>
-  </div>
-</div>
-
-<!-- Register modal -->
-<div class="modal hidden" id="registerModal" role="dialog" aria-modal="true">
-  <div class="box" tabindex="0">
-    <button class="close" id="closeRegister">✕</button>
-    <h3>რეგისტრაცია</h3>
-    <form id="registerForm" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
-      <input id="regFirst" placeholder="სახელი" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
-      <input id="regLast" placeholder="გვარი" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
-      <div style="display:flex;gap:8px">
-        <input id="regYear" placeholder="დაბ. წელი" type="number" min="1900" max="2025" required style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
-        <input id="regNick" placeholder="ნიკ ნეიმი" required style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
-      </div>
-      <div style="display:flex;gap:8px">
-        <input id="regPass" placeholder="პაროლი" type="password" minlength="6" required style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
-        <input id="regPassConfirm" placeholder="გაიმეორეთ" type="password" minlength="6" required style="flex:1;padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
-      </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input id="regAvatarInput" type="file" accept="image/*" style="display:none" />
-        <button type="button" id="regAvatarBtn" class="icon-btn">📷</button>
-        <div id="regAvatarPreview" class="small">ავატარი (არასავალდებულო)</div>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button type="submit" class="send-btn">რეგისტრაცია</button>
-        <button type="button" id="openLoginFromRegisterBtn" class="icon-btn">🔐</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Login modal -->
-<div class="modal hidden" id="loginModal" role="dialog" aria-modal="true">
-  <div class="box" tabindex="0">
-    <button class="close" id="closeLogin">✕</button>
-    <h3>შესვლა</h3>
-    <form id="loginForm" style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
-      <input id="loginNick" placeholder="ნიკ ნეიმი" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
-      <input id="loginPass" placeholder="პაროლი" type="password" required style="padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02)" />
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button type="submit" class="send-btn">შესვლა</button>
-        <button type="button" id="openRegisterFromLoginBtn" class="icon-btn">✍️</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- View other user's profile modal -->
-<div class="modal hidden" id="viewProfileModal" role="dialog" aria-modal="true">
-  <div class="box" tabindex="0">
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <h3 id="viewProfileTitle" style="margin:0">მომხმარებლის პროფილი</h3>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button id="collapseViewBtn" class="icon-btn" title="ჩაკეცვა">⤢</button>
-        <button class="close" id="closeViewProfile">✕</button>
-      </div>
-    </div>
-    <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
-      <img id="viewAvatar" class="avatar-large" src="https://picsum.photos/96" alt="ავატარი" />
-      <div>
-        <div id="viewFullName" style="font-weight:700">სახელი გვარი</div>
-        <div id="viewNickname" style="color:var(--muted);margin-top:6px">@ნიკნეიმი</div>
-      </div>
-    </div>
-    <div style="margin-top:12px" class="small">დაბ. წელი: <span id="viewYear">----</span> • ასაკი: <span id="viewAge">--</span></div>
-  </div>
-</div>
-
-<!-- Firebase SDK (modular) init placeholder -->
+<!-- Firebase SDK (modular) -->
 <script type="module">
-  // Import Firebase modular SDK and expose minimal helpers on window._firebase
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-  // --- REPLACE with your Firebase config from console ---
+  // --- REPLACE with your Firebase config ---
   const firebaseConfig = {
     apiKey: "YOUR_API_KEY",
     authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    // optional: storageBucket, messagingSenderId, appId
+    projectId: "YOUR_PROJECT_ID"
+    // storageBucket, messagingSenderId, appId optional
   };
 
+  // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // Expose to global for main script to use
-  window._firebase = { db, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp };
-</script>
+  // App state
+  const LS_USER = 'chat_demo_user';
+  let currentUser = JSON.parse(localStorage.getItem(LS_USER) || 'null');
+  const msgsCol = collection(db, 'chat_messages');
+  const q = query(msgsCol, orderBy('createdAt', 'asc'));
 
-<script>
-/* Main chat script with Firestore realtime sync */
-(async function(){
-  const $ = id => document.getElementById(id);
-
-  // Elements
-  const messagesEl = $('messages');
-  const usersListEl = $('usersList');
-  const composerInput = $('composerInput');
-  const sendBtn = $('sendBtn');
-  const attachBtn = $('attachBtn');
-  const fileInput = $('fileInput');
-  const recordBtn = $('recordBtn');
-
-  const loginHeaderBtn = $('loginHeaderBtn');
-  const openRegisterBtn = $('openRegisterBtn');
-  const openRegisterBtn2 = $('openRegisterBtn2');
-  const openProfileBtn = $('openProfileBtn');
-  const logoutBtn = $('logoutBtn');
-  const statusText = $('statusText');
-  const themeToggle = $('themeToggle');
-
-  const profileModal = $('profileModal');
-  const closeProfile = $('closeProfile');
-  const closeProfileBtn = $('closeProfileBtn');
-  const changeAvatarBtn = $('changeAvatarBtn');
-  const avatarUploadInput = $('avatarUploadInput');
-  const editProfileBtn = $('editProfileBtn');
-
-  const registerModal = $('registerModal');
-  const closeRegister = $('closeRegister');
-  const registerForm = $('registerForm');
-  const regFirst = $('regFirst');
-  const regLast = $('regLast');
-  const regYear = $('regYear');
-  const regNick = $('regNick');
-  const regPass = $('regPass');
-  const regPassConfirm = $('regPassConfirm');
-  const regAvatarBtn = $('regAvatarBtn');
-  const regAvatarInput = $('regAvatarInput');
-  const regAvatarPreview = $('regAvatarPreview');
-  const openLoginFromRegisterBtn = $('openLoginFromRegisterBtn');
-
-  const loginModal = $('loginModal');
-  const closeLogin = $('closeLogin');
-  const loginForm = $('loginForm');
-  const loginNick = $('loginNick');
-  const loginPass = $('loginPass');
-
-  const viewProfileModal = $('viewProfileModal');
-  const closeViewProfile = $('closeViewProfile');
-  const collapseViewBtn = $('collapseViewBtn');
-  const viewAvatar = $('viewAvatar');
-  const viewFullName = $('viewFullName');
-  const viewNickname = $('viewNickname');
-  const viewYear = $('viewYear');
-  const viewAge = $('viewAge');
-
-  // Firestore helpers (must be available from module script)
-  const FB = window._firebase || null;
-  if(!FB){
-    console.warn('Firebase not initialized. Add firebase config script before main script.');
-  }
-
-  // Storage keys
-  const LS_USERS = 'chatapp_users';
-  const LS_CURRENT = 'chatapp_current';
-  const LS_MESSAGES = 'chatapp_messages';
-  const LS_THEME = 'chatapp_theme';
-
-  // State
-  let users = safeLoad(LS_USERS) || [];
-  let currentUser = safeLoad(LS_CURRENT) || null;
-  let messages = []; // will be populated from Firestore snapshot
-  let pendingFile = null;
-  let pendingPreviewEl = null;
-
-  // Recorder
-  let mediaRecorder = null;
-  let mediaStream = null;
-  let recordingChunks = [];
-  let isRecording = false;
+  // DOM
+  const statusEl = document.getElementById('status');
+  const messagesEl = document.getElementById('messages');
+  const usersEl = document.getElementById('users');
+  const textInput = document.getElementById('textInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const demoLogin = document.getElementById('demoLogin');
+  const nickInput = document.getElementById('nickInput');
+  const meInfo = document.getElementById('meInfo');
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
 
   // Helpers
-  function safeLoad(key){ try { return JSON.parse(localStorage.getItem(key)); } catch(e){ return null; } }
-  function safeSave(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
-  function uid(prefix='id'){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
-  function timeNow(){ const d=new Date(); return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
   function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  async function sha256Hex(str){ try { const enc = new TextEncoder(); const data = enc.encode(str); const hash = await crypto.subtle.digest('SHA-256', data); return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join(''); } catch(e){ return null; } }
-
-  // Demo users if none
-  function initDemoUsers(){
-    if(!Array.isArray(users) || users.length === 0){
-      users = [
-        { id: 'u_demo1', first:'ანა', last:'მცირიშვილი', year:1992, nick:'ana92', avatar:'https://picsum.photos/seed/ana/96', passHash:null },
-        { id: 'u_demo2', first:'გიორგი', last:'კაპანაძე', year:1988, nick:'giorgi88', avatar:'https://picsum.photos/seed/giorgi/96', passHash:null }
-      ];
-      safeSave(LS_USERS, users);
-    }
-  }
-
-  // Render users
-  function renderUsers(){
-    if(!usersListEl) return;
-    usersListEl.innerHTML = '';
-    users.forEach(u=>{
-      const item = document.createElement('div');
-      item.className = 'user-item';
-      const isMe = currentUser && currentUser.id === u.id;
-      item.innerHTML = `<div style="display:flex;align-items:center"><img src="${u.avatar||'https://picsum.photos/36'}" alt="" /><div style="margin-left:8px"><strong>${escapeHtml(u.first)} ${escapeHtml(u.last)}</strong><div class="small">@${escapeHtml(u.nick)}</div></div></div><div>${isMe?'<span class="small">მე</span>':'<button class="icon-btn view-profile-btn" data-id="'+u.id+'" title="ნახვა">👁️</button>'}</div>`;
-      usersListEl.appendChild(item);
-    });
-  }
-
-  // Render messages (from messages array)
-  function renderMessages(){
-    if(!messagesEl) return;
-    messagesEl.innerHTML = '';
-    messages.forEach(m=>{
-      const author = users.find(u=>u.id===m.userId) || {nick:'unknown', first:'', last:'', avatar:'https://picsum.photos/36'};
-      const el = document.createElement('div');
-      el.className = 'message ' + (currentUser && currentUser.id===m.userId ? 'me' : 'other');
-      el.dataset.id = m.id;
-
-      const header = document.createElement('div'); header.className='msg-header';
-      const avatar = document.createElement('img'); avatar.src = author.avatar || 'https://picsum.photos/36'; avatar.alt = author.nick;
-      header.appendChild(avatar);
-      const name = document.createElement('div'); name.innerHTML = `<div class="msg-author">${escapeHtml(author.first)} ${escapeHtml(author.last)} <span style="font-weight:600;color:var(--muted);font-size:12px">(@${escapeHtml(author.nick)})</span></div>`;
-      header.appendChild(name);
-      el.appendChild(header);
-
-      const content = document.createElement('div'); content.innerHTML = escapeHtml(m.text || '').replace(/\n/g,'<br>');
-      el.appendChild(content);
-
-      if(m.file){
-        if(m.file.type && m.file.type.startsWith('image/')){
-          const img = document.createElement('img'); img.className='uploaded'; img.src = m.file.data; img.style.maxWidth='220px'; img.style.marginTop='8px'; el.appendChild(img);
-        } else if(m.file.type && m.file.type.startsWith('audio/')){
-          const audio = document.createElement('audio'); audio.className='uploaded'; audio.controls=true; audio.src = m.file.data; audio.style.marginTop='8px'; el.appendChild(audio);
-        } else {
-          const link = document.createElement('div'); link.textContent = m.file.name || 'ფაილი'; link.style.marginTop='8px'; link.className='small'; el.appendChild(link);
-        }
-      }
-
-      // reactions
-      const reactionWrap = document.createElement('div'); reactionWrap.className = 'reaction-list';
-      (m.reactions || []).forEach(r=>{
-        const item = document.createElement('div');
-        const userHas = Array.isArray(r.users) && currentUser && r.users.includes(currentUser.id);
-        item.className = 'reaction-item' + (userHas ? ' active' : '');
-        item.dataset.emoji = r.emoji;
-        item.innerHTML = `${escapeHtml(r.emoji)} <span class="small">${r.count}</span>`;
-        item.addEventListener('click', (ev)=>{ ev.stopPropagation(); toggleReaction(m.id, r.emoji); });
-        reactionWrap.appendChild(item);
-      });
-
-      const actions = document.createElement('div'); actions.className='msg-actions';
-      const toggle = document.createElement('button'); toggle.className='reaction-toggle'; toggle.setAttribute('aria-expanded','false'); toggle.textContent='🙂';
-      toggle.addEventListener('click', (ev)=>{ ev.stopPropagation(); openReactionPanelForMessage(el, m.id); });
-      actions.appendChild(toggle);
-      actions.appendChild(reactionWrap);
-
-      if(currentUser && m.userId === currentUser.id){
-        const del = document.createElement('button'); del.className='btn-delete'; del.textContent='წაშლა';
-        del.addEventListener('click', ()=>{ if(confirm('ნამდვილად წაშლა?')){ deleteMessage(m.id); }});
-        actions.appendChild(del);
-      }
-
-      el.appendChild(actions);
-      messagesEl.appendChild(el);
-    });
+  function timeStr(ts){ try{ return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }catch(e){return ''} }
+  function renderMessage(m){
+    const el = document.createElement('div');
+    el.className = 'msg ' + ((currentUser && currentUser.id === m.userId) ? 'me' : 'other');
+    el.innerHTML = `<div><strong>${escapeHtml(m.username||'Anon')}</strong></div><div style="margin-top:6px">${escapeHtml(m.text||'')}</div><div class="meta">${timeStr(m.createdAt?.seconds ? m.createdAt.seconds*1000 : (m.createdAt||m.ts)||Date.now())}</div>`;
+    messagesEl.appendChild(el);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  // Reaction helpers
-  function ensureReactionStructure(msg){
-    if(!msg.reactions) msg.reactions = [];
-    msg.reactions.forEach(r => { if(!Array.isArray(r.users)) r.users = []; if(typeof r.count !== 'number') r.count = r.users.length; });
-  }
+  function setStatus(s){ statusEl.textContent = 'დაკავშირება: ' + s; }
 
-  function toggleReaction(messageId, emoji){
-    if(!currentUser){ alert('რეაქციის დასამატებლად საჭიროა შესვლა'); return; }
-    const msg = messages.find(m => m.id === messageId);
-    if(!msg) return;
-    ensureReactionStructure(msg);
-    let r = msg.reactions.find(x => x.emoji === emoji);
-    if(!r){
-      r = { emoji, count: 0, users: [] };
-      msg.reactions.push(r);
-    }
-    const idx = r.users.indexOf(currentUser.id);
-    if(idx === -1){
-      r.users.push(currentUser.id);
-      r.count = (r.count || 0) + 1;
+  // Auth (demo local)
+  function setCurrentUser(u){
+    currentUser = u;
+    if(u){
+      localStorage.setItem(LS_USER, JSON.stringify(u));
+      meInfo.textContent = `შენ: ${u.username}`;
+      loginBtn.style.display = 'none';
+      logoutBtn.style.display = 'inline-block';
     } else {
-      r.users.splice(idx,1);
-      r.count = Math.max(0, (r.count || 1) - 1);
-      if(r.count === 0) msg.reactions = msg.reactions.filter(x => x.emoji !== emoji);
-    }
-    msg.reactionCount = (msg.reactions || []).reduce((s,x)=>s + (x.count||0), 0);
-    safeSave(LS_MESSAGES, messages);
-    renderMessages();
-
-    // Update Firestore reactions for that message (merge)
-    if(FB){
-      const { db, collection, addDoc } = FB;
-      // Use Firestore update via RESTless approach: write reactions back by doc id
-      // We'll call a small helper exposed below to update reactions in Firestore
-      updateMessageReactionsInFirestore(messageId, msg.reactions).catch(e=>console.error(e));
+      localStorage.removeItem(LS_USER);
+      meInfo.textContent = '';
+      loginBtn.style.display = 'inline-block';
+      logoutBtn.style.display = 'none';
     }
   }
+  // init
+  setCurrentUser(currentUser);
 
-  // Delete message (local + Firestore)
-  async function deleteMessage(messageId){
-    messages = messages.filter(m => m.id !== messageId);
-    safeSave(LS_MESSAGES, messages);
-    renderMessages();
-    if(FB){
-      try {
-        const { db } = FB;
-        // delete doc by id
-        // Firestore delete requires import of deleteDoc and doc; use dynamic import
-        const mod = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js");
-        const { doc, deleteDoc } = mod;
-        await deleteDoc(doc(db, 'chat_messages', messageId));
-      } catch(e){ console.error('Firestore delete error', e); }
-    }
-  }
-
-  // Update reactions in Firestore (merge)
-  async function updateMessageReactionsInFirestore(messageId, reactions){
-    if(!FB) return;
-    try {
-      const { db } = FB;
-      const mod = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js");
-      const { doc, updateDoc } = mod;
-      await updateDoc(doc(db, 'chat_messages', messageId), { reactions: reactions, reactionCount: reactions.reduce((s,x)=>s+(x.count||0),0) });
-    } catch(e){ console.error('update reactions error', e); }
-  }
-
-  // Reaction panel (quick set)
-  const QUICK_REACTIONS = ['👍','❤️','😂','😮','😢','🔥','🤩'];
-  const reactionPanelEl = document.createElement('div');
-  reactionPanelEl.style.position = 'fixed';
-  reactionPanelEl.style.zIndex = 2000;
-  reactionPanelEl.style.display = 'none';
-  reactionPanelEl.style.padding = '6px';
-  reactionPanelEl.style.borderRadius = '12px';
-  reactionPanelEl.style.background = 'rgba(10,12,18,0.96)';
-  reactionPanelEl.style.boxShadow = '0 12px 36px rgba(2,6,23,0.6)';
-  document.body.appendChild(reactionPanelEl);
-
-  function openReactionPanelForMessage(messageEl, messageId){
-    reactionPanelEl.innerHTML = '';
-    QUICK_REACTIONS.forEach(emoji=>{
-      const b = document.createElement('button');
-      b.textContent = emoji;
-      b.style.fontSize = '20px';
-      b.style.margin = '4px';
-      b.style.padding = '6px';
-      b.style.border = '0';
-      b.style.background = 'transparent';
-      b.style.cursor = 'pointer';
-      b.addEventListener('click', (ev)=>{ ev.stopPropagation(); toggleReaction(messageId, emoji); closeReactionPanel(); });
-      reactionPanelEl.appendChild(b);
-    });
-    const rect = messageEl.getBoundingClientRect();
-    const panelW = Math.min(320, window.innerWidth - 24);
-    reactionPanelEl.style.width = panelW + 'px';
-    reactionPanelEl.style.left = Math.max(8, rect.left + rect.width/2 - panelW/2) + 'px';
-    const above = rect.top - 56;
-    if(above > 80) reactionPanelEl.style.top = (rect.top - 56) + 'px';
-    else reactionPanelEl.style.top = (rect.bottom + 8) + 'px';
-    reactionPanelEl.style.display = 'block';
-    setTimeout(()=> document.addEventListener('click', outsideReactionClick), 10);
-  }
-  function closeReactionPanel(){ reactionPanelEl.style.display = 'none'; reactionPanelEl.innerHTML = ''; document.removeEventListener('click', outsideReactionClick); }
-  function outsideReactionClick(e){ if(!reactionPanelEl.contains(e.target)) closeReactionPanel(); }
-
-  // Modal helpers
-  function openModal(modal){ if(!modal) return; modal.classList.remove('hidden'); const box = modal.querySelector('.box'); if(box) box.focus(); }
-  function closeModal(modal){ if(!modal) return; modal.classList.add('hidden'); }
-
-  // Registration handlers
-  if(regAvatarBtn && regAvatarInput){
-    regAvatarBtn.addEventListener('click', ()=> regAvatarInput.click());
-    regAvatarInput.addEventListener('change', (e)=> {
-      const f = e.target.files && e.target.files[0]; if(!f) return;
-      const r = new FileReader(); r.onload = ()=> { regAvatarPreview.textContent = f.name; regAvatarPreview.style.backgroundImage = `url(${r.result})`; regAvatarPreview.style.backgroundSize='cover'; regAvatarPreview.style.padding='8px'; regAvatarPreview.style.borderRadius='8px'; };
-      r.readAsDataURL(f);
-    });
-  }
-
-  if(registerForm){
-    registerForm.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const first = regFirst.value.trim(), last = regLast.value.trim(), year = parseInt(regYear.value,10), nick = regNick.value.trim();
-      const pass = regPass.value, passC = regPassConfirm.value;
-      if(!first||!last||!year||!nick||!pass||!passC){ alert('გთხოვთ შეავსოთ ყველა ველი'); return; }
-      if(pass !== passC){ alert('პაროლები არ ემთხვევა'); return; }
-      if(pass.length < 6){ alert('პაროლი უნდა იყოს მინიმუმ 6 სიმბოლო'); return; }
-      if(users.some(u=>u.nick.toLowerCase()===nick.toLowerCase())){ alert('ნიკი დაკავებულია'); return; }
-      const passHash = await sha256Hex(pass);
-      const newUser = { id: uid('u'), first, last, year, nick, avatar:null, passHash };
-      const f = regAvatarInput.files && regAvatarInput.files[0];
-      if(f){
-        const r = new FileReader(); r.onload = ()=> { newUser.avatar = r.result; users.push(newUser); safeSave(LS_USERS, users); currentUser = newUser; safeSave(LS_CURRENT, currentUser); closeModal(registerModal); updateAuthUI(); renderUsers(); renderMessages(); };
-        r.readAsDataURL(f);
-      } else {
-        users.push(newUser); safeSave(LS_USERS, users); currentUser = newUser; safeSave(LS_CURRENT, currentUser); closeModal(registerModal); updateAuthUI(); renderUsers(); renderMessages();
-      }
-    });
-  }
-
-  // Login
-  if(loginForm){
-    loginForm.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const nick = loginNick.value.trim(), pass = loginPass.value;
-      if(!nick||!pass){ alert('შეიყვანეთ ნიკი და პაროლი'); return; }
-      const user = users.find(u=>u.nick.toLowerCase()===nick.toLowerCase());
-      if(!user){ alert('მომხმარებელი ვერ მოიძებნა'); return; }
-      if(!user.passHash){ alert('ამ მომხმარებელს პაროლი არ აქვს'); return; }
-      const h = await sha256Hex(pass);
-      if(h !== user.passHash){ alert('პაროლი არასწორია'); return; }
-      currentUser = user; safeSave(LS_CURRENT, currentUser); closeModal(loginModal); updateAuthUI(); renderUsers(); renderMessages();
-    });
-  }
-
-  // Header buttons
-  if(loginHeaderBtn) loginHeaderBtn.addEventListener('click', ()=> openModal(loginModal));
-  if(openRegisterBtn) openRegisterBtn.addEventListener('click', ()=> openModal(registerModal));
-  if(openRegisterBtn2) openRegisterBtn2.addEventListener('click', ()=> openModal(registerModal));
-  if(openLoginFromRegisterBtn) openLoginFromRegisterBtn.addEventListener('click', ()=> { closeModal(registerModal); openModal(loginModal); });
-  if($('openRegisterFromLoginBtn')) $('openRegisterFromLoginBtn').addEventListener('click', ()=> { closeModal(loginModal); openModal(registerModal); });
-
-  if(logoutBtn) logoutBtn.addEventListener('click', ()=> { if(!currentUser){ alert('არ ხართ შესული'); return; } if(!confirm('ნამდვილად გსურთ გასვლა?')) return; currentUser=null; safeSave(LS_CURRENT, currentUser); updateAuthUI(); renderUsers(); renderMessages(); });
-
-  // Profile modal (current user)
-  if(openProfileBtn) openProfileBtn.addEventListener('click', ()=> { if(!currentUser){ alert('გთხოვთ შეხვიდეთ ან დარეგისტრირდეთ'); return; } showCurrentProfile(); openModal(profileModal); });
-  if(closeProfile) closeProfile.addEventListener('click', ()=> closeModal(profileModal));
-  if(closeProfileBtn) closeProfileBtn.addEventListener('click', ()=> closeModal(profileModal));
-  if(profileModal) profileModal.addEventListener('click', (e)=> { if(e.target === profileModal) closeModal(profileModal); });
-
-  function showCurrentProfile(){
-    if(!currentUser) return;
-    $('profileAvatar').src = currentUser.avatar || 'https://picsum.photos/96';
-    $('profileFullName').textContent = `${currentUser.first} ${currentUser.last}`;
-    $('profileNickname').textContent = `@${currentUser.nick}`;
-    $('profileYear').textContent = currentUser.year || '----';
-    $('profileAge').textContent = computeAge(currentUser.year);
-  }
-
-  if(changeAvatarBtn && avatarUploadInput){
-    changeAvatarBtn.addEventListener('click', ()=> avatarUploadInput.click());
-    avatarUploadInput.addEventListener('change', (e)=> {
-      const f = e.target.files && e.target.files[0]; if(!f || !currentUser) return;
-      const r = new FileReader(); r.onload = ()=> { currentUser.avatar = r.result; const idx = users.findIndex(u=>u.id===currentUser.id); if(idx>=0) users[idx].avatar = currentUser.avatar; safeSave(LS_USERS, users); safeSave(LS_CURRENT, currentUser); showCurrentProfile(); renderUsers(); renderMessages(); };
-      r.readAsDataURL(f);
-    });
-  }
-
-  if(editProfileBtn){
-    editProfileBtn.addEventListener('click', ()=> {
-      if(!currentUser) return;
-      const newFirst = prompt('სახელი', currentUser.first) || currentUser.first;
-      const newLast = prompt('გვარი', currentUser.last) || currentUser.last;
-      const newYear = parseInt(prompt('დაბადების წელი', currentUser.year) || currentUser.year,10) || currentUser.year;
-      const newNick = prompt('ნიკ ნეიმი', currentUser.nick) || currentUser.nick;
-      if(newNick !== currentUser.nick && users.some(u => u.nick.toLowerCase() === newNick.toLowerCase())){ alert('ეს ნიკნეიმი დაკავებულია'); return; }
-      currentUser.first = newFirst; currentUser.last = newLast; currentUser.year = newYear; currentUser.nick = newNick;
-      const idx = users.findIndex(u => u.id === currentUser.id); if(idx >= 0) users[idx] = currentUser;
-      safeSave(LS_USERS, users); safeSave(LS_CURRENT, currentUser); showCurrentProfile(); renderUsers(); renderMessages();
-    });
-  }
-
-  // View other user's profile
-  if(usersListEl){
-    usersListEl.addEventListener('click', (e)=>{
-      const btn = e.target.closest('.view-profile-btn') || e.target.closest('.view-btn');
-      if(!btn) return;
-      const uid = btn.dataset.user || btn.dataset.id;
-      const u = users.find(x => x.id === uid);
-      if(!u) return;
-      viewAvatar.src = u.avatar || 'https://picsum.photos/96';
-      viewFullName.textContent = `${u.first} ${u.last}`;
-      viewNickname.textContent = `@${u.nick}`;
-      viewYear.textContent = u.year || '----';
-      viewAge.textContent = computeAge(u.year);
-      if(viewProfileModal) viewProfileModal.classList.remove('view-collapsed');
-      if(collapseViewBtn) collapseViewBtn.classList.remove('collapsed');
-      openModal(viewProfileModal);
-    });
-  }
-
-  if(closeViewProfile){
-    closeViewProfile.addEventListener('click', ()=> { if(viewProfileModal) viewProfileModal.classList.remove('view-collapsed'); if(collapseViewBtn) collapseViewBtn.classList.remove('collapsed'); closeModal(viewProfileModal); });
-  }
-  if(viewProfileModal){
-    viewProfileModal.addEventListener('click', (e)=> { if(e.target === viewProfileModal){ viewProfileModal.classList.remove('view-collapsed'); if(collapseViewBtn) collapseViewBtn.classList.remove('collapsed'); closeModal(viewProfileModal); }});
-  }
-  if(collapseViewBtn && viewProfileModal){
-    collapseViewBtn.addEventListener('click', ()=> {
-      const isCollapsed = collapseViewBtn.classList.toggle('collapsed');
-      if(isCollapsed) viewProfileModal.classList.add('view-collapsed');
-      else viewProfileModal.classList.remove('view-collapsed');
-    });
-  }
-
-  // Attach preview
-  if(attachBtn && fileInput){
-    attachBtn.addEventListener('click', ()=> fileInput.click());
-    fileInput.addEventListener('change', (e)=>{
-      const f = e.target.files && e.target.files[0]; if(!f) return;
-      pendingFile = f;
-      if(pendingPreviewEl && pendingPreviewEl.parentNode) pendingPreviewEl.parentNode.removeChild(pendingPreviewEl);
-      const preview = document.createElement('div'); preview.style.display='flex'; preview.style.alignItems='center'; preview.style.gap='8px'; preview.style.marginLeft='8px'; preview.style.padding='6px'; preview.style.borderRadius='8px'; preview.style.background='rgba(255,255,255,0.02)';
-      const name = document.createElement('div'); name.className='small'; name.textContent = f.name; preview.appendChild(name);
-      if(f.type.startsWith('image/')){ const r=new FileReader(); const img=document.createElement('img'); img.style.width='56px'; img.style.height='56px'; img.style.objectFit='cover'; img.style.borderRadius='8px'; preview.insertBefore(img,name); r.onload=()=>img.src=r.result; r.readAsDataURL(f); }
-      else if(f.type.startsWith('audio/')){ const ic=document.createElement('div'); ic.textContent='🔊'; ic.style.fontSize='22px'; preview.insertBefore(ic,name); }
-      else { const ic=document.createElement('div'); ic.textContent='📄'; ic.style.fontSize='22px'; preview.insertBefore(ic,name); }
-      const rem = document.createElement('button'); rem.className='icon-btn'; rem.style.width='36px'; rem.style.height='36px'; rem.textContent='✕'; rem.addEventListener('click', ()=>{ pendingFile=null; fileInput.value=''; if(preview.parentNode) preview.parentNode.removeChild(preview); pendingPreviewEl=null; });
-      preview.appendChild(rem);
-      const composer = document.querySelector('.composer');
-      if(composer) composer.insertBefore(preview, sendBtn);
-      pendingPreviewEl = preview;
-    });
-  }
-
-  // Send message integrated with Firestore
-  async function sendMessage(){
-    if(!currentUser){ alert('გთხოვთ შეხვიდეთ ან დარეგისტრირდეთ'); return; }
-    const text = composerInput ? composerInput.value.trim() : '';
-    if(!text && !pendingFile) return;
-    if(!FB){ // fallback local-only
-      const localMsg = createMessageObject({ text: text||'', file: pendingFile && pendingFile.data ? pendingFile : null, userId: currentUser.id });
-      messages.push(localMsg);
-      safeSave(LS_MESSAGES, messages);
-      if(composerInput) composerInput.value='';
-      if(pendingPreviewEl && pendingPreviewEl.parentNode) pendingPreviewEl.parentNode.removeChild(pendingPreviewEl);
-      pendingPreviewEl = null;
-      pendingFile = null;
-      renderMessages();
-      return;
-    }
-
-    const { db, collection, addDoc, serverTimestamp } = FB;
-    const msgsCol = collection(db, 'chat_messages');
-
-    // If there's a File object, convert to dataURL first
-    if(pendingFile && pendingFile instanceof File){
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const fileObj = { name: pendingFile.name, type: pendingFile.type, data: reader.result };
-        try {
-          const docRef = await addDoc(msgsCol, {
-            text: text || '',
-            userId: currentUser.id,
-            file: fileObj,
-            createdAt: serverTimestamp(),
-            timeStr: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-            reactions: [],
-            reactionCount: 0
-          });
-          // optional: immediate local push using docRef.id
-          const localMsg = {
-            id: docRef.id,
-            text: text || '',
-            userId: currentUser.id,
-            time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-            file: fileObj,
-            reactions: [],
-            reactionCount: 0
-          };
-          messages.push(localMsg);
-          safeSave(LS_MESSAGES, messages);
-          renderMessages();
-        } catch(e){ console.error('Firestore addDoc error', e); alert('შეტყობინების გაგზავნა ვერ მოხერხდა'); }
-        if(composerInput) composerInput.value='';
-        pendingFile = null;
-        if(pendingPreviewEl && pendingPreviewEl.parentNode) pendingPreviewEl.parentNode.removeChild(pendingPreviewEl);
-        pendingPreviewEl = null;
-      };
-      reader.readAsDataURL(pendingFile);
-      return;
-    }
-
-    // No file or file already has data
-    try {
-      const docRef = await addDoc(msgsCol, {
-        text: text || '',
-        userId: currentUser.id,
-        file: null,
-        createdAt: serverTimestamp(),
-        timeStr: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-        reactions: [],
-        reactionCount: 0
+  // Firestore realtime listener
+  let unsubscribe = null;
+  try {
+    unsubscribe = onSnapshot(q, (snapshot) => {
+      messagesEl.innerHTML = '';
+      const msgs = [];
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        msgs.push({ id: docSnap.id, ...data });
       });
-      // optional immediate local push
-      const localMsg = {
-        id: docRef.id,
-        text: text || '',
-        userId: currentUser.id,
-        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-        file: null,
-        reactions: [],
-        reactionCount: 0
-      };
-      messages.push(localMsg);
-      safeSave(LS_MESSAGES, messages);
-      renderMessages();
-    } catch(e){ console.error('Firestore addDoc error', e); alert('შეტყობინების გაგზავნა ვერ მოხერხდა'); }
-    if(composerInput) composerInput.value='';
-  }
-
-  if(sendBtn) sendBtn.addEventListener('click', sendMessage);
-  if(composerInput) composerInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
-
-  // Recording (same as before)
-  if(recordBtn){
-    recordBtn.addEventListener('click', async ()=>{
-      if(isRecording){ if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); return; }
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true });
-        mediaRecorder = new MediaRecorder(mediaStream);
-        recordingChunks = [];
-        mediaRecorder.ondataavailable = (ev)=>{ if(ev.data && ev.data.size) recordingChunks.push(ev.data); };
-        mediaRecorder.onstop = ()=>{
-          try {
-            const blob = new Blob(recordingChunks, { type:'audio/webm' });
-            const f = new File([blob], 'voice-'+Date.now()+'.webm', { type: blob.type });
-            const reader = new FileReader();
-            reader.onload = ()=>{
-              pendingFile = { name: f.name, type: f.type, data: reader.result };
-              if(pendingPreviewEl && pendingPreviewEl.parentNode) pendingPreviewEl.parentNode.removeChild(pendingPreviewEl);
-              const preview = document.createElement('div'); preview.style.display='flex'; preview.style.alignItems='center'; preview.style.gap='8px'; preview.style.marginLeft='8px'; preview.style.padding='6px'; preview.style.borderRadius='8px'; preview.style.background='rgba(255,255,255,0.02)';
-              const icon = document.createElement('div'); icon.textContent='🔊'; icon.style.fontSize='22px';
-              const name = document.createElement('div'); name.style.fontSize='13px'; name.style.color='var(--muted)'; name.textContent = f.name;
-              const removeBtn = document.createElement('button'); removeBtn.className='icon-btn'; removeBtn.style.width='36px'; removeBtn.style.height='36px'; removeBtn.textContent='✕';
-              removeBtn.addEventListener('click', ()=>{ pendingFile=null; fileInput.value=''; if(preview.parentNode) preview.parentNode.removeChild(preview); pendingPreviewEl=null; });
-              preview.appendChild(icon); preview.appendChild(name); preview.appendChild(removeBtn);
-              const composer = document.querySelector('.composer');
-              if(composer) composer.insertBefore(preview, sendBtn);
-              pendingPreviewEl = preview;
-            };
-            reader.readAsDataURL(blob);
-            try { if(mediaStream && mediaStream.getTracks) mediaStream.getTracks().forEach(t=>t.stop()); } catch(e){}
-          } catch(err){ console.error('record stop error', err); alert('ჩაწერის დამთავრება ვერ მოხერხდა'); }
-          isRecording=false; recordBtn.classList.remove('recording'); recordBtn.setAttribute('aria-pressed','false'); recordBtn.textContent = '🎤';
-        };
-        mediaRecorder.start();
-        isRecording=true; recordBtn.classList.add('recording'); recordBtn.setAttribute('aria-pressed','true'); recordBtn.textContent='⏹️';
-      } catch(err){ console.error('getUserMedia error', err); alert('მიკროფონის გამოყენება შეუძლებელია: ' + (err && err.message ? err.message : '')); isRecording=false; }
-    });
-  }
-
-  // Firestore realtime listener setup
-  let knownIds = new Set();
-  if(FB){
-    const { db, collection, onSnapshot, query, orderBy } = FB;
-    const msgsCol = collection(db, 'chat_messages');
-    const q = query(msgsCol, orderBy('createdAt', 'asc'));
-
-    onSnapshot(q, (snapshot) => {
-      let changed = false;
-      snapshot.docChanges().forEach(change => {
-        const doc = change.doc;
-        const data = doc.data();
-        const mid = doc.id;
-        if(change.type === 'removed'){
-          // remove locally if exists
-          const idx = messages.findIndex(m => m.id === mid);
-          if(idx !== -1){ messages.splice(idx,1); knownIds.delete(mid); changed = true; }
-          return;
-        }
-        if(!knownIds.has(mid)){
-          const msg = {
-            id: mid,
-            text: data.text || '',
-            userId: data.userId || 'unknown',
-            time: data.timeStr || (data.createdAt && data.createdAt.toDate ? data.createdAt.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''),
-            file: data.file || null,
-            reactions: data.reactions || [],
-            reactionCount: data.reactionCount || 0
-          };
-          messages.push(msg);
-          knownIds.add(mid);
-          changed = true;
-        } else {
-          // update existing (e.g., reactions changed)
-          const idx = messages.findIndex(m => m.id === mid);
-          if(idx !== -1){
-            messages[idx].reactions = data.reactions || [];
-            messages[idx].reactionCount = data.reactionCount || 0;
-            changed = true;
-          }
-        }
-      });
-      if(changed){
-        safeSave(LS_MESSAGES, messages);
-        renderMessages();
-      }
+      // render
+      msgs.forEach(renderMessage);
+      setStatus('online (Firestore)');
     }, (err) => {
-      console.error('Firestore onSnapshot error', err);
+      console.error('onSnapshot error', err);
+      setStatus('error');
     });
-  } else {
-    // If Firestore not available, load local messages
-    messages = safeLoad(LS_MESSAGES) || [];
-    messages.forEach(m => knownIds.add(m.id));
+  } catch (e) {
+    console.error('Firestore init error', e);
+    setStatus('not connected');
   }
 
-  // Theme toggle
-  function applyTheme(t){ if(t==='light') document.body.classList.add('light'); else document.body.classList.remove('light'); safeSave(LS_THEME, t); }
-  applyTheme(safeLoad(LS_THEME) || 'dark');
-  if(themeToggle) themeToggle.addEventListener('click', ()=> applyTheme(document.body.classList.contains('light') ? 'dark' : 'light'));
-
-  // Utilities
-  function createMessageObject({text,file,userId}){
-    return { id: uid('m'), text, userId, time: timeNow(), file: file ? (file.data ? file : { name: file.name, type: file.type, data: file.data }) : null, reactions: [], reactionCount: 0 };
-  }
-  function computeAge(year){ if(!year) return '--'; const y = parseInt(year,10); if(!y || isNaN(y)) return '--'; return new Date().getFullYear() - y; }
-
-  // Update header auth UI
-  function updateAuthUI(){
-    if(!statusText) return;
-    if(currentUser){
-      if(loginHeaderBtn) loginHeaderBtn.style.display='none';
-      if(openRegisterBtn) openRegisterBtn.style.display='none';
-      if(openRegisterBtn2) openRegisterBtn2.style.display='none';
-      if(openProfileBtn) openProfileBtn.style.display='inline-flex';
-      if(logoutBtn) logoutBtn.style.display='inline-flex';
-      statusText.textContent = `მომხმარებელი: @${currentUser.nick}`;
-    } else {
-      if(loginHeaderBtn) loginHeaderBtn.style.display='inline-flex';
-      if(openRegisterBtn) openRegisterBtn.style.display='inline-flex';
-      if(openRegisterBtn2) openRegisterBtn2.style.display='inline-flex';
-      if(openProfileBtn) openProfileBtn.style.display='none';
-      if(logoutBtn) logoutBtn.style.display='none';
-      statusText.textContent = 'გთხოვთ შეხვიდეთ ან დარეგისტრირდეთ';
+  // Send message
+  async function sendMessage(){
+    const text = textInput.value.trim();
+    if(!text) return;
+    const payload = {
+      text,
+      username: currentUser ? currentUser.username : 'Guest',
+      userId: currentUser ? currentUser.id : null,
+      createdAt: serverTimestamp(),
+      reactions: []
+    };
+    try {
+      await addDoc(msgsCol, payload);
+      textInput.value = '';
+    } catch (e) {
+      console.error('send error', e);
+      alert('შეტყობინების გაგზავნა ვერ მოხერხდა');
     }
   }
 
-  // Initial setup
-  try { initDemoUsers(); } catch(e){ console.error(e); }
-  try { updateAuthUI(); } catch(e){}
-  try { renderUsers(); } catch(e){}
-  try { renderMessages(); } catch(e){}
+  sendBtn.addEventListener('click', sendMessage);
+  textInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
 
-  // Expose for debug
-  window._chat = { users, messages, currentUser };
+  // Demo login (local only) — creates a simple client identity used for messages
+  demoLogin.addEventListener('click', ()=>{
+    const nick = (nickInput.value || '').trim();
+    if(!nick){ alert('შეიყვანე ნიკი'); return; }
+    // create a simple id
+    const id = 'u_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    setCurrentUser({ id, username: nick });
+    nickInput.value = '';
+  });
 
-})(); // end IIFE
+  // Simple logout
+  logoutBtn.addEventListener('click', ()=> setCurrentUser(null));
+
+  // Login button opens demo login input focus
+  loginBtn.addEventListener('click', ()=> nickInput.focus());
+
+  // Users list: derive from recent messages (simple)
+  // Update users list whenever snapshot changes
+  function updateUsersFromSnapshot(snapshot){
+    const map = new Map();
+    snapshot.forEach(docSnap => {
+      const d = docSnap.data();
+      if(d && d.userId){
+        map.set(d.userId, { id: d.userId, username: d.username });
+      }
+    });
+    usersEl.innerHTML = '';
+    for(const u of map.values()){
+      const div = document.createElement('div');
+      div.className = 'user';
+      div.innerHTML = `<div><strong>${escapeHtml(u.username)}</strong></div><div class="small">id:${escapeHtml(u.id)}</div>`;
+      usersEl.appendChild(div);
+    }
+  }
+
+  // Re-attach a snapshot listener that also updates users list
+  // (we already have unsubscribe; create a combined listener)
+  try {
+    // detach previous
+    if(typeof unsubscribe === 'function') unsubscribe();
+    const q2 = query(msgsCol, orderBy('createdAt', 'asc'));
+    const unsub2 = onSnapshot(q2, (snapshot) => {
+      messagesEl.innerHTML = '';
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        renderMessage({ id: docSnap.id, ...data });
+      });
+      updateUsersFromSnapshot(snapshot);
+      setStatus('online (Firestore)');
+    }, (err) => {
+      console.error('onSnapshot error', err);
+      setStatus('error');
+    });
+    // keep reference
+    unsubscribe = unsub2;
+  } catch(e){
+    console.error('listener error', e);
+    setStatus('not connected');
+  }
+
+  // Optional: expose send for console testing
+  window._chat = { sendMessage, db };
 </script>
 </body>
 </html>
