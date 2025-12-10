@@ -22,6 +22,7 @@
 .send{background:var(--accent);border:0;padding:10px 14px;border-radius:10px;color:#042027;font-weight:700;cursor:pointer}
 .users{padding:8px;display:flex;flex-direction:column;gap:8px}
 .user{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:rgba(255,255,255,0.04);cursor:pointer}
+.loading{opacity:0.7;font-size:13px;color:var(--muted);padding:8px}
 @media (max-width:900px){.container{grid-template-columns:1fr;padding:8px}.messages{height:56vh}}
 </style>
 </head>
@@ -41,6 +42,7 @@
     </div>
 
     <div id="messages" class="messages" aria-live="polite"></div>
+    <div id="loading" class="loading" style="display:none">იტვირთება...</div>
 
     <div class="composer" role="region" aria-label="საჯარო შეტყობინება">
       <input id="text" class="input" placeholder="საჯარო შეტყობინება..." />
@@ -69,6 +71,7 @@
   const messagesEl = document.getElementById('messages');
   const usersEl = document.getElementById('users');
   const onlineCountEl = document.getElementById('onlineCount');
+  const loadingEl = document.getElementById('loading');
 
   const nickEl = document.getElementById('nick');
   const loginBtn = document.getElementById('login');
@@ -84,6 +87,12 @@
   // Socket.IO client with cookies
   const socket = io({ withCredentials: true });
 
+  // track rendered message ids to avoid duplicates
+  const renderedMsgIds = new Set();
+  let initFetched = false;
+
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
   function renderMessage(m) {
     const mine = m.userId && window._me && m.userId === window._me.id;
     const el = document.createElement('div');
@@ -92,19 +101,84 @@
                     <div style="margin-top:6px">${escapeHtml(m.text || '')}</div>
                     <div class="meta">${new Date(m.ts || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
     messagesEl.appendChild(el);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    // keep scroll at bottom unless user scrolled up
+    const atBottom = messagesEl.scrollHeight - messagesEl.clientHeight - messagesEl.scrollTop < 100;
+    if (atBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
   }
-  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  socket.on('connect', () => {
+  function renderMessageOnce(m) {
+    if (!m) return;
+    // prefer numeric or string id; fallback to generated key if none
+    const id = m.id != null ? String(m.id) : null;
+    if (id) {
+      if (renderedMsgIds.has(id)) return;
+      renderedMsgIds.add(id);
+    }
+    renderMessage(m);
+  }
+
+  // show/hide loading
+  function setLoading(v) { loadingEl.style.display = v ? 'block' : 'none'; }
+
+  socket.on('connect', async () => {
     statusEl.textContent = 'დაკავშირება: connected';
+    // bind session user to socket if session exists
+    try {
+      const r = await fetch('/api/me', { credentials: 'include' });
+      if (r.ok) {
+        const data = await r.json();
+        if (data && data.user) {
+          window._me = { id: data.user.id, username: data.user.username };
+          loginBtn.style.display = 'none';
+          logoutBtn.style.display = 'inline-block';
+          // inform server in case session attach didn't happen automatically
+          socket.emit('identify', { userId: window._me.id, username: window._me.username });
+        }
+      }
+    } catch (e) {
+      console.warn('me fetch failed', e);
+    }
+
+    // If server sends initMessages automatically, we'll receive it via socket.on('initMessages').
+    // As a fallback, fetch via REST once after connect.
+    if (!initFetched) {
+      initFetched = true;
+      setLoading(true);
+      try {
+        const r = await fetch('/api/messages/public', { credentials: 'include' });
+        if (r.ok) {
+          const json = await r.json();
+          if (json && Array.isArray(json.messages)) {
+            // clear UI and dedupe set before rendering
+            messagesEl.innerHTML = '';
+            renderedMsgIds.clear();
+            json.messages.forEach(m => renderMessageOnce(m));
+          }
+        }
+      } catch (e) {
+        console.warn('public messages fetch failed', e);
+      } finally {
+        setLoading(false);
+      }
+    }
   });
+
   socket.on('disconnect', () => {
     statusEl.textContent = 'დაკავშირება: disconnected';
   });
 
-  socket.on('message', (m) => renderMessage(m));
-  socket.on('privateMessage', (m) => renderMessage(m));
+  // initMessages from server (preferred)
+  socket.on('initMessages', (msgs) => {
+    if (!Array.isArray(msgs)) return;
+    messagesEl.innerHTML = '';
+    renderedMsgIds.clear();
+    msgs.forEach(m => renderMessageOnce(m));
+  });
+
+  // realtime events use deduped renderer
+  socket.on('message', (m) => renderMessageOnce(m));
+  socket.on('privateMessage', (m) => renderMessageOnce(m));
+
   socket.on('onlineCount', ({ count }) => onlineCountEl.textContent = count);
   socket.on('users', (list) => {
     usersEl.innerHTML = '';
@@ -134,7 +208,7 @@
       loginBtn.style.display = 'none';
       logoutBtn.style.display = 'inline-block';
       statusEl.textContent = 'დაკავშირება: connected (' + data.username + ')';
-      // optional: inform server in case session attach delays
+      // inform server to bind socket to this user immediately
       socket.emit('identify', { userId: window._me.id, username: window._me.username });
     } catch (e) {
       alert('შესვლის შეცდომა');
@@ -155,6 +229,7 @@
   sendBtn.addEventListener('click', () => {
     const text = (textEl.value || '').trim();
     if (!text) return;
+    // optimistic UI: we rely on server to persist and emit back with id; avoid double render here
     socket.emit('chatMessage', { text });
     textEl.value = '';
   });
@@ -173,6 +248,32 @@
   pmTextEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendPmBtn.click(); }
   });
+
+  // Optional: load private history for a user (when opening a PM conversation)
+  async function loadPrivateHistory(username) {
+    if (!username) return;
+    setLoading(true);
+    try {
+      const r = await fetch('/api/messages/private/' + encodeURIComponent(username), { credentials: 'include' });
+      if (r.ok) {
+        const json = await r.json();
+        if (json && Array.isArray(json.messages)) {
+          messagesEl.innerHTML = '';
+          renderedMsgIds.clear();
+          json.messages.forEach(m => renderMessageOnce(m));
+        }
+      } else {
+        console.warn('private history fetch failed', await r.text());
+      }
+    } catch (e) {
+      console.warn('private history error', e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // expose helper for console testing
+  window._chat = { renderMessageOnce, loadPrivateHistory };
 </script>
 </body>
 </html>
