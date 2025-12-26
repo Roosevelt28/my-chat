@@ -1,168 +1,249 @@
+/* ზოგადი სტილი - Dark Mode */
 :root {
-    --bg-color: #f0f2f5;
-    --text-color: #333;
-    --card-bg: #fff;
-    --primary: #0084ff;
-    --secondary: #e4e6eb;
-    --shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-/* ღამის რეჟიმის ცვლადები */
-body.dark-mode {
-    --bg-color: #18191a;
-    --text-color: #e4e6eb;
-    --card-bg: #242526;
-    --primary: #2d88ff;
-    --secondary: #3a3b3c;
-    --shadow: 0 2px 5px rgba(0,0,0,0.5);
+    --bg: #0f0f0f;
+    --panel: #1e1e1e;
+    --input-bg: #2c2c2c;
+    --text: #e0e0e0;
+    --accent: #00d26a; /* ნეონის მწვანე */
+    --accent-hover: #00b058;
+    --msg-me: #005c4b;
+    --msg-other: #202c33;
 }
 
 body {
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', sans-serif;
     margin: 0;
-    transition: background 0.3s, color 0.3s;
+    height: 100vh;
+    overflow: hidden;
 }
 
-.navbar {
-    background: var(--card-bg);
+/* რეგისტრაციის ფანჯარა */
+.overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+.login-box {
+    background: var(--panel);
+    padding: 40px;
+    border-radius: 15px;
+    width: 300px;
+    text-align: center;
+    border: 1px solid #333;
+    box-shadow: 0 0 20px rgba(0, 210, 106, 0.2);
+}
+.login-box input, .login-box select {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    background: var(--input-bg);
+    border: none;
+    color: white;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+.login-box button {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    border: none;
+    color: black;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+/* მთავარი აპლიკაცია */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.hidden { display: none !important; }
+
+header {
+    background: var(--panel);
     padding: 10px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: var(--shadow);
+    border-bottom: 1px solid #333;
 }
-
-.section { display: none; padding: 20px; }
-.section.active { display: block; animation: fadeIn 0.5s; }
-.section.hidden { display: none; }
-
-/* რეგისტრაცია */
-.auth-box {
-    background: var(--card-bg);
-    padding: 30px;
-    border-radius: 10px;
-    text-align: center;
-    max-width: 350px;
-    margin: 50px auto;
-    box-shadow: var(--shadow);
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
 }
-.auth-box input, .auth-box select {
-    width: 90%;
-    padding: 10px;
-    margin: 10px 0;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-}
-
-/* პროფილის სტილი */
-.profile-header {
-    background: var(--card-bg);
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-    box-shadow: var(--shadow);
-}
-.profile-pic-container {
-    position: relative;
-    width: 150px;
-    height: 150px;
-    margin: 0 auto;
-}
-.profile-pic-container img {
-    width: 100%;
-    height: 100%;
+.user-info img {
+    width: 40px; height: 40px;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid var(--primary);
 }
-.upload-btn {
-    position: absolute;
-    bottom: 5px;
-    right: 5px;
-    background: var(--primary);
+.actions button {
+    background: transparent;
+    color: var(--text);
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+/* ჩატი */
+.chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background-image: radial-gradient(#333 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.message {
+    max-width: 70%;
+    padding: 10px 15px;
+    border-radius: 15px;
+    position: relative;
+    word-wrap: break-word;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+.msg-me {
+    background: var(--msg-me);
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+}
+.msg-other {
+    background: var(--msg-other);
+    align-self: flex-start;
+    border-bottom-left-radius: 2px;
+}
+.msg-time {
+    font-size: 0.7rem;
+    opacity: 0.6;
+    display: block;
+    text-align: right;
+    margin-top: 5px;
+}
+
+/* ინპუტი */
+.input-area {
+    background: var(--panel);
+    padding: 15px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.input-area input {
+    flex: 1;
+    background: var(--input-bg);
+    border: none;
+    padding: 12px;
+    border-radius: 25px;
     color: white;
+}
+.send-btn {
+    background: var(--accent);
+    border: none;
+    width: 45px; height: 45px;
+    border-radius: 50%;
+    color: #000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.attach-btn {
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+/* პროფილის Sidebar */
+.profile-sidebar {
+    position: fixed;
+    top: 0; right: -100%;
+    width: 300px;
+    height: 100%;
+    background: #111;
+    border-left: 1px solid #333;
+    transition: 0.3s;
+    z-index: 500;
+    overflow-y: auto;
+}
+.profile-sidebar.open { right: 0; }
+.close-btn {
+    position: absolute;
+    top: 10px; right: 15px;
+    background: none; border: none;
+    color: white; font-size: 2rem; cursor: pointer;
+}
+.profile-content {
+    padding: 40px 20px;
+    text-align: center;
+}
+.profile-img-box {
+    position: relative;
+    width: 120px; height: 120px;
+    margin: 0 auto 20px;
+}
+.profile-img-box img {
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--accent);
+}
+.edit-icon {
+    position: absolute;
+    bottom: 0; right: 0;
+    background: var(--accent);
+    color: black;
     padding: 8px;
     border-radius: 50%;
     cursor: pointer;
 }
-.badge {
-    background: var(--secondary);
+.tag {
+    background: #333;
     display: inline-block;
-    padding: 5px 15px;
-    border-radius: 15px;
-    font-size: 0.9em;
+    padding: 5px 10px;
+    border-radius: 5px;
+    color: var(--accent);
+    font-size: 0.9rem;
 }
-
-/* გალერეა */
-.gallery-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 10px;
-    margin-top: 20px;
-}
-.gallery-img {
-    width: 100%;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-/* ჩატი */
-.chat-container {
-    background: var(--card-bg);
-    border-radius: 10px;
-    overflow: hidden;
-    height: 80vh;
+.stats {
     display: flex;
-    flex-direction: column;
-    box-shadow: var(--shadow);
-}
-.chat-window {
-    flex: 1;
-    padding: 15px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
+    justify-content: center;
     gap: 10px;
+    margin: 20px 0;
 }
-.message {
-    padding: 10px 15px;
-    border-radius: 20px;
-    max-width: 70%;
-    position: relative;
-    animation: popIn 0.3s;
-}
-.my-message {
-    background: var(--primary);
+.stats button {
+    background: #333;
+    border: 1px solid #444;
     color: white;
-    align-self: flex-end;
-}
-.other-message {
-    background: var(--secondary);
-    align-self: flex-start;
-}
-.chat-input-area {
-    padding: 10px;
-    background: var(--secondary);
-    display: flex;
-    gap: 10px;
-}
-.chat-input-area input {
-    flex: 1;
-    padding: 10px;
-    border-radius: 20px;
-    border: none;
-}
-button {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 10px 20px;
+    padding: 8px 15px;
     border-radius: 5px;
     cursor: pointer;
 }
-
-/* ანიმაციები */
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    margin-top: 15px;
+}
+.gallery-grid img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 3px;
+}
