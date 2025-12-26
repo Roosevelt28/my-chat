@@ -1,122 +1,177 @@
-// ელემენტების აღება
-const themeToggle = document.getElementById('themeToggle');
-const body = document.body;
-const chatWindow = document.getElementById('chatWindow');
-const messageInput = document.getElementById('messageInput');
+// ელემენტების ინიციალიზაცია
+const loginOverlay = document.getElementById('loginOverlay');
+const mainApp = document.getElementById('mainApp');
+const chatArea = document.getElementById('chatArea');
+const msgInput = document.getElementById('msgInput');
 
-// 1. დღის და ღამის რეჟიმი
-themeToggle.addEventListener('click', () => {
-    body.classList.toggle('dark-mode');
-    const icon = themeToggle.querySelector('i');
-    if (body.classList.contains('dark-mode')) {
-        icon.classList.remove('fa-moon');
-        icon.classList.add('fa-sun');
+// 1. შემოწმება: დარეგისტრირებულია თუ არა მომხმარებელი?
+window.onload = function() {
+    const savedUser = localStorage.getItem('chatUser_data');
+    if (savedUser) {
+        loadUser(JSON.parse(savedUser));
     } else {
-        icon.classList.remove('fa-sun');
-        icon.classList.add('fa-moon');
+        loginOverlay.style.display = 'flex';
     }
-});
-
-// 2. სექციების გადართვა (ნავიგაცია)
-function showSection(sectionId) {
-    document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active', 'hidden'));
-    document.getElementById(sectionId).classList.add('active');
-}
-
-// 3. რეგისტრაციის სიმულაცია
-let currentUser = {
-    name: "სტუმარი",
-    purpose: "",
-    photo: "https://via.placeholder.com/150"
+    loadMessages();
 };
 
-function registerUser() {
+// 2. რეგისტრაცია
+function completeRegistration() {
     const name = document.getElementById('regName').value;
-    const purpose = document.getElementById('regPurpose').value;
     const dob = document.getElementById('regDob').value;
+    const purpose = document.getElementById('regPurpose').value;
 
-    if (name) {
-        currentUser.name = name;
-        currentUser.purpose = purpose;
-        
-        // მონაცემების ასახვა პროფილში
-        document.getElementById('displayName').textContent = name;
-        const purposeText = {
-            'coffee': '☕ ყავის დალევა',
-            'dating': '❤️ დაოჯახება',
-            'hangout': '🎉 დროის გაყვანა'
-        };
-        document.getElementById('displayPurpose').textContent = purposeText[purpose];
-        document.getElementById('displayDate').textContent = "რეგისტრირებულია: " + new Date().toLocaleDateString();
+    if (!name || !purpose) {
+        alert("შეავსეთ სახელი და აირჩიეთ მიზანი!");
+        return;
+    }
 
-        // გადაყვანა პროფილზე
-        document.getElementById('authSection').classList.add('hidden');
-        showSection('profileSection');
-    } else {
-        alert("გთხოვთ შეიყვანოთ სახელი");
+    const userData = {
+        name: name,
+        dob: dob,
+        purpose: purpose,
+        avatar: `https://ui-avatars.com/api/?name=${name}&background=00d26a&color=fff`,
+        joined: new Date().toLocaleDateString()
+    };
+
+    localStorage.setItem('chatUser_data', JSON.stringify(userData));
+    loadUser(userData);
+}
+
+// 3. მომხმარებლის ჩატვირთვა
+function loadUser(user) {
+    loginOverlay.style.display = 'none';
+    mainApp.classList.remove('hidden');
+
+    // ჰედერი
+    document.getElementById('headerName').textContent = user.name;
+    document.getElementById('headerAvatar').src = user.avatar;
+
+    // პროფილი
+    document.getElementById('profileName').textContent = user.name;
+    document.getElementById('profileBigImg').src = user.avatar;
+    
+    // მიზნის ტექსტი
+    const purposes = { 'coffee': '☕ ყავა & საუბარი', 'dating': '❤️ დაოჯახება', 'chill': '🕶️ დროის გაყვანა' };
+    document.getElementById('profilePurpose').textContent = purposes[user.purpose] || user.purpose;
+    
+    // ასაკის გამოთვლა
+    if(user.dob) {
+        const age = new Date().getFullYear() - new Date(user.dob).getFullYear();
+        document.getElementById('profileDob').textContent = `ასაკი: ${age} წლის`;
+    }
+
+    // გალერეის ჩატვირთვა
+    loadGallery();
+}
+
+// 4. ჩატის ფუნქციები
+msgInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMsg();
+});
+
+function sendMsg() {
+    const text = msgInput.value.trim();
+    if (!text) return;
+
+    saveMessage(text, 'me');
+    msgInput.value = '';
+    
+    // ავტო-პასუხი (სიმულაცია)
+    setTimeout(() => {
+        const replies = ["გასაგებია...", "კარგი აზრია! 👍", "ჰაჰა, მართლა? 😄", "მოიცა, ახლა დაკავებული ვარ...", "ok"];
+        const randomReply = replies[Math.floor(Math.random() * replies.length)];
+        saveMessage(randomReply, 'other');
+    }, 1500);
+}
+
+function saveMessage(text, type) {
+    const msgs = JSON.parse(localStorage.getItem('chat_history') || '[]');
+    const newMsg = { text, type, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) };
+    msgs.push(newMsg);
+    localStorage.setItem('chat_history', JSON.stringify(msgs));
+    renderMessage(newMsg);
+}
+
+function loadMessages() {
+    chatArea.innerHTML = '';
+    const msgs = JSON.parse(localStorage.getItem('chat_history') || '[]');
+    msgs.forEach(msg => renderMessage(msg));
+}
+
+function renderMessage(msg) {
+    const div = document.createElement('div');
+    div.className = `message ${msg.type === 'me' ? 'msg-me' : 'msg-other'}`;
+    div.innerHTML = `${msg.text} <span class="msg-time">${msg.time}</span>`;
+    
+    // წაშლა ორჯერ კლიკით
+    div.addEventListener('dblclick', function(){
+        if(confirm('წავშალოთ?')) {
+            this.remove();
+            // რეალურ პროექტში აქ localStorage-დანაც უნდა წაიშალოს
+        }
+    });
+
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function clearChat() {
+    if(confirm('ნამდვილად გინდათ ჩატის გასუფთავება?')) {
+        localStorage.removeItem('chat_history');
+        chatArea.innerHTML = '';
     }
 }
 
-// 4. ფოტოს ატვირთვის სიმულაცია (ბრაუზერში)
-function uploadProfilePhoto(event) {
+// 5. პროფილის და გალერეის ფუნქციები
+function toggleProfile() {
+    document.getElementById('profileSidebar').classList.toggle('open');
+}
+
+function handlePhotoUpload(event) {
     const file = event.target.files[0];
     if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            document.getElementById('profilePic').src = e.target.result;
-            // ფოტოს დამატება გალერეაშიც
-            addToGallery(e.target.result);
+            const imgData = e.target.result;
+            
+            // შევინახოთ გალერეაში
+            const gallery = JSON.parse(localStorage.getItem('user_gallery') || '[]');
+            gallery.push(imgData);
+            localStorage.setItem('user_gallery', JSON.stringify(gallery));
+            
+            // ეკრანზე გამოჩენა
+            addImgToGrid(imgData);
+            
+            // მთავარ ფოტოდ დაყენება
+            document.getElementById('profileBigImg').src = imgData;
+            document.getElementById('headerAvatar').src = imgData;
+            
+            // User მონაცემების განახლება
+            let userData = JSON.parse(localStorage.getItem('chatUser_data'));
+            userData.avatar = imgData;
+            localStorage.setItem('chatUser_data', JSON.stringify(userData));
         }
         reader.readAsDataURL(file);
     }
 }
 
-function addToGallery(imgSrc) {
-    const gallery = document.getElementById('galleryGrid');
-    const img = document.createElement('img');
-    img.src = imgSrc;
-    img.className = 'gallery-img';
-    gallery.appendChild(img);
+function loadGallery() {
+    const grid = document.getElementById('userGallery');
+    grid.innerHTML = '';
+    const gallery = JSON.parse(localStorage.getItem('user_gallery') || '[]');
+    gallery.forEach(img => addImgToGrid(img));
 }
 
-// 5. ჩატის ფუნქციები (სქროლი + Enter)
-messageInput.addEventListener('keypress', function (e) {
-    if (e.key === 'Enter') {
-        sendMessage();
+function addImgToGrid(src) {
+    const img = document.createElement('img');
+    img.src = src;
+    document.getElementById('userGallery').appendChild(img);
+}
+
+function logout() {
+    if(confirm('გასვლა?')) {
+        localStorage.removeItem('chatUser_data');
+        location.reload();
     }
-});
-
-function sendMessage() {
-    const text = messageInput.value;
-    if (text.trim() === "") return;
-
-    // მესიჯის დამატება
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('message', 'my-message');
-    
-    // დროის დამატება
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    msgDiv.innerHTML = `${text} <span style="font-size:0.7em; opacity:0.7; float:right; margin-left:5px;">${time}</span>`;
-    
-    // წაშლის ფუნქცია (ორჯერ დაწკაპუნებით)
-    msgDiv.addEventListener('dblclick', function() {
-        if(confirm("წავშალოთ მესიჯი?")) {
-            this.remove();
-        }
-    });
-
-    chatWindow.appendChild(msgDiv);
-    messageInput.value = "";
-
-    // სქროლის გასწორება (ავტომატურად ჩასვლა)
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-
-    // სიმულაცია: პასუხი 1 წამში
-    setTimeout(() => {
-        const replyDiv = document.createElement('div');
-        replyDiv.classList.add('message', 'other-message');
-        replyDiv.innerHTML = `გამარჯობა ${currentUser.name}, როგორ ხარ? 😊 <div style="margin-top:5px;">❤️ 👍 😆</div>`;
-        chatWindow.appendChild(replyDiv);
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-    }, 1000);
 }
