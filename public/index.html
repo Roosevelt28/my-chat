@@ -1,80 +1,279 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ka">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Chat</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Realtime Chat — Socket.IO</title>
+<style>
+:root{--bg:#071024;--panel:rgba(255,255,255,0.03);--accent:#06b6d4;--muted:#94a3b8;--text:#e6eef6}
+*{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,Helvetica;background:linear-gradient(180deg,var(--bg),#071a2a);color:var(--text)}
+.container{max-width:980px;margin:18px auto;padding:12px;display:grid;grid-template-columns:1fr 320px;gap:12px}
+.panel{background:var(--panel);padding:12px;border-radius:10px;overflow:hidden}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.brand{font-weight:700;color:var(--accent)}
+.small{font-size:13px;color:var(--muted)}
+.messages{height:60vh;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,0.02);border-radius:10px}
+.msg{max-width:78%;padding:10px;border-radius:12px;box-shadow:0 8px 20px rgba(2,6,23,0.4)}
+.me{align-self:flex-end;background:linear-gradient(90deg,#0ea5a4,#0891b2);color:#042027}
+.other{align-self:flex-start;background:rgba(255,255,255,0.06);color:#dde7f3}
+.meta{font-size:12px;color:var(--muted);margin-top:6px;text-align:right}
+.composer{display:flex;gap:8px;padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent)}
+.input, .input-small{flex:1;padding:12px;border-radius:10px;border:0;background:rgba(255,255,255,0.04);color:inherit}
+.send{background:var(--accent);border:0;padding:10px 14px;border-radius:10px;color:#042027;font-weight:700;cursor:pointer}
+.users{padding:8px;display:flex;flex-direction:column;gap:8px}
+.user{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:rgba(255,255,255,0.04);cursor:pointer}
+.loading{opacity:0.7;font-size:13px;color:var(--muted);padding:8px}
+@media (max-width:900px){.container{grid-template-columns:1fr;padding:8px}.messages{height:56vh}}
+</style>
 </head>
 <body>
-
-    <div id="loginOverlay" class="overlay">
-        <div class="login-box">
-            <h2><i class="fas fa-user-secret"></i> იდენტიფიკაცია</h2>
-            <input type="text" id="regName" placeholder="სახელი / ზედმეტსახელი">
-            <input type="date" id="regDob" title="დაბადების თარიღი">
-            <select id="regPurpose">
-                <option value="" disabled selected>აირჩიე მიზანი...</option>
-                <option value="coffee">☕ ყავა & საუბარი</option>
-                <option value="dating">❤️ ურთიერთობა</option>
-                <option value="chill">🕶️ დროის გაყვანა</option>
-            </select>
-            <button onclick="completeRegistration()">სისტემაში შესვლა</button>
-        </div>
+<div class="container">
+  <div class="panel">
+    <div class="header">
+      <div>
+        <div class="brand">Chat</div>
+        <div id="status" class="small">დაკავშირება: —</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="nick" class="input-small" placeholder="ნიკი" style="max-width:200px" />
+        <button id="login" class="send">შესვლა</button>
+        <button id="logout" class="send" style="display:none">გასვლა</button>
+      </div>
     </div>
 
-    <div id="mainApp" class="app-container hidden">
-        
-        <header>
-            <div class="user-info" onclick="toggleProfile()">
-                <img id="headerAvatar" src="https://ui-avatars.com/api/?name=User&background=random" alt="Avatar">
-                <span id="headerName">მომხმარებელი</span>
-            </div>
-            <div class="actions">
-                <button onclick="clearChat()" title="ჩატის გასუფთავება"><i class="fas fa-trash"></i></button>
-                <button onclick="logout()" title="გასვლა"><i class="fas fa-sign-out-alt"></i></button>
-            </div>
-        </header>
+    <div id="messages" class="messages" aria-live="polite"></div>
+    <div id="loading" class="loading" style="display:none">იტვირთება...</div>
 
-        <div id="chatArea" class="chat-area">
-            </div>
-
-        <div class="input-area">
-            <button class="attach-btn"><i class="far fa-smile"></i></button>
-            <input type="text" id="msgInput" placeholder="აკრიფეთ ტექსტი...">
-            <button onclick="sendMsg()" class="send-btn"><i class="fas fa-paper-plane"></i></button>
-        </div>
-
-        <div id="profileSidebar" class="profile-sidebar">
-            <button class="close-btn" onclick="toggleProfile()">&times;</button>
-            
-            <div class="profile-content">
-                <div class="profile-img-box">
-                    <img id="profileBigImg" src="https://ui-avatars.com/api/?name=User" alt="Profile">
-                    <label for="photoUpload" class="edit-icon"><i class="fas fa-camera"></i></label>
-                    <input type="file" id="photoUpload" hidden accept="image/*" onchange="handlePhotoUpload(event)">
-                </div>
-                
-                <h2 id="profileName">სახელი</h2>
-                <p id="profilePurpose" class="tag">მიზანი</p>
-                <p id="profileDob" class="info-text">ასაკი: -</p>
-
-                <div class="stats">
-                    <button><i class="fas fa-user-plus"></i> მეგობრობა</button>
-                    <button><i class="fas fa-envelope"></i> მიწერა</button>
-                </div>
-
-                <div class="gallery-section">
-                    <h3>გალერეა / კედელი</h3>
-                    <div class="gallery-grid" id="userGallery">
-                        </div>
-                </div>
-            </div>
-        </div>
-
+    <div class="composer" role="region" aria-label="საჯარო შეტყობინება">
+      <input id="text" class="input" placeholder="საჯარო შეტყობინება..." />
+      <button id="send" class="send">გაგზავნა</button>
     </div>
 
-    <script src="script.js"></script>
+    <div class="composer" role="region" aria-label="პირადი შეტყობინება">
+      <input id="toUser" class="input" placeholder="მიმღები ნიკი (პირადი)" />
+      <input id="pmText" class="input" placeholder="პირადი შეტყობინება..." />
+      <button id="sendPm" class="send">PM</button>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h4 style="margin:0">მომხმარებლები</h4>
+      <div class="small">ონლაინ: <span id="onlineCount">0</span></div>
+    </div>
+    <div id="users" class="users"></div>
+  </aside>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const statusEl = document.getElementById('status');
+  const messagesEl = document.getElementById('messages');
+  const usersEl = document.getElementById('users');
+  const onlineCountEl = document.getElementById('onlineCount');
+  const loadingEl = document.getElementById('loading');
+
+  const nickEl = document.getElementById('nick');
+  const loginBtn = document.getElementById('login');
+  const logoutBtn = document.getElementById('logout');
+
+  const textEl = document.getElementById('text');
+  const sendBtn = document.getElementById('send');
+
+  const toUserEl = document.getElementById('toUser');
+  const pmTextEl = document.getElementById('pmText');
+  const sendPmBtn = document.getElementById('sendPm');
+
+  // Socket.IO client with cookies
+  const socket = io({ withCredentials: true });
+
+  // track rendered message ids to avoid duplicates
+  const renderedMsgIds = new Set();
+  let initFetched = false;
+
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function renderMessage(m) {
+    const mine = m.userId && window._me && m.userId === window._me.id;
+    const el = document.createElement('div');
+    el.className = 'msg ' + (mine ? 'me' : 'other');
+    el.innerHTML = `<div><strong>${escapeHtml(m.username || m.fromUsername || 'Anon')}</strong></div>
+                    <div style="margin-top:6px">${escapeHtml(m.text || '')}</div>
+                    <div class="meta">${new Date(m.ts || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
+    messagesEl.appendChild(el);
+    // keep scroll at bottom unless user scrolled up
+    const atBottom = messagesEl.scrollHeight - messagesEl.clientHeight - messagesEl.scrollTop < 100;
+    if (atBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function renderMessageOnce(m) {
+    if (!m) return;
+    // prefer numeric or string id; fallback to generated key if none
+    const id = m.id != null ? String(m.id) : null;
+    if (id) {
+      if (renderedMsgIds.has(id)) return;
+      renderedMsgIds.add(id);
+    }
+    renderMessage(m);
+  }
+
+  // show/hide loading
+  function setLoading(v) { loadingEl.style.display = v ? 'block' : 'none'; }
+
+  socket.on('connect', async () => {
+    statusEl.textContent = 'დაკავშირება: connected';
+    // bind session user to socket if session exists
+    try {
+      const r = await fetch('/api/me', { credentials: 'include' });
+      if (r.ok) {
+        const data = await r.json();
+        if (data && data.user) {
+          window._me = { id: data.user.id, username: data.user.username };
+          loginBtn.style.display = 'none';
+          logoutBtn.style.display = 'inline-block';
+          // inform server in case session attach didn't happen automatically
+          socket.emit('identify', { userId: window._me.id, username: window._me.username });
+        }
+      }
+    } catch (e) {
+      console.warn('me fetch failed', e);
+    }
+
+    // If server sends initMessages automatically, we'll receive it via socket.on('initMessages').
+    // As a fallback, fetch via REST once after connect.
+    if (!initFetched) {
+      initFetched = true;
+      setLoading(true);
+      try {
+        const r = await fetch('/api/messages/public', { credentials: 'include' });
+        if (r.ok) {
+          const json = await r.json();
+          if (json && Array.isArray(json.messages)) {
+            // clear UI and dedupe set before rendering
+            messagesEl.innerHTML = '';
+            renderedMsgIds.clear();
+            json.messages.forEach(m => renderMessageOnce(m));
+          }
+        }
+      } catch (e) {
+        console.warn('public messages fetch failed', e);
+      } finally {
+        setLoading(false);
+      }
+    }
+  });
+
+  socket.on('disconnect', () => {
+    statusEl.textContent = 'დაკავშირება: disconnected';
+  });
+
+  // initMessages from server (preferred)
+  socket.on('initMessages', (msgs) => {
+    if (!Array.isArray(msgs)) return;
+    messagesEl.innerHTML = '';
+    renderedMsgIds.clear();
+    msgs.forEach(m => renderMessageOnce(m));
+  });
+
+  // realtime events use deduped renderer
+  socket.on('message', (m) => renderMessageOnce(m));
+  socket.on('privateMessage', (m) => renderMessageOnce(m));
+
+  socket.on('onlineCount', ({ count }) => onlineCountEl.textContent = count);
+  socket.on('users', (list) => {
+    usersEl.innerHTML = '';
+    list.forEach(u => {
+      const div = document.createElement('div');
+      div.className = 'user';
+      div.innerHTML = `<div><strong>${escapeHtml(u.username)}</strong></div><div class="small">${escapeHtml(u.id)}</div>`;
+      div.addEventListener('click', () => { toUserEl.value = u.username; });
+      usersEl.appendChild(div);
+    });
+  });
+
+  // Login via API
+  loginBtn.addEventListener('click', async () => {
+    const nick = (nickEl.value || '').trim();
+    if (!nick) { alert('შეიყვანე ნიკი'); return; }
+    try {
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ nickname: nick })
+      });
+      const data = await r.json();
+      if (!data.ok) { alert(data.error || 'შესვლის შეცდომა'); return; }
+      window._me = { id: data.userId, username: data.username };
+      loginBtn.style.display = 'none';
+      logoutBtn.style.display = 'inline-block';
+      statusEl.textContent = 'დაკავშირება: connected (' + data.username + ')';
+      // inform server to bind socket to this user immediately
+      socket.emit('identify', { userId: window._me.id, username: window._me.username });
+    } catch (e) {
+      alert('შესვლის შეცდომა');
+    }
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+      window._me = null;
+      loginBtn.style.display = 'inline-block';
+      logoutBtn.style.display = 'none';
+      statusEl.textContent = 'დაკავშირება: connected (Guest)';
+    } catch (e) {}
+  });
+
+  // Send public
+  sendBtn.addEventListener('click', () => {
+    const text = (textEl.value || '').trim();
+    if (!text) return;
+    // optimistic UI: we rely on server to persist and emit back with id; avoid double render here
+    socket.emit('chatMessage', { text });
+    textEl.value = '';
+  });
+  textEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
+  });
+
+  // Send private
+  sendPmBtn.addEventListener('click', () => {
+    const to = (toUserEl.value || '').trim();
+    const text = (pmTextEl.value || '').trim();
+    if (!to || !text) return;
+    socket.emit('privateMessage', { toUsername: to, text });
+    pmTextEl.value = '';
+  });
+  pmTextEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendPmBtn.click(); }
+  });
+
+  // Optional: load private history for a user (when opening a PM conversation)
+  async function loadPrivateHistory(username) {
+    if (!username) return;
+    setLoading(true);
+    try {
+      const r = await fetch('/api/messages/private/' + encodeURIComponent(username), { credentials: 'include' });
+      if (r.ok) {
+        const json = await r.json();
+        if (json && Array.isArray(json.messages)) {
+          messagesEl.innerHTML = '';
+          renderedMsgIds.clear();
+          json.messages.forEach(m => renderMessageOnce(m));
+        }
+      } else {
+        console.warn('private history fetch failed', await r.text());
+      }
+    } catch (e) {
+      console.warn('private history error', e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // expose helper for console testing
+  window._chat = { renderMessageOnce, loadPrivateHistory };
+</script>
 </body>
 </html>
