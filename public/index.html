@@ -3,71 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoChat Social</title>
+    <title>Ghost Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
 
-    <nav class="navbar">
-        <div class="logo">GeoChat</div>
-        <div class="nav-icons">
-            <button id="themeToggle"><i class="fas fa-moon"></i></button>
-            <button onclick="showSection('profileSection')"><i class="fas fa-user"></i> პროფილი</button>
-            <button onclick="showSection('chatSection')"><i class="fas fa-comments"></i> ჩატი</button>
+    <div id="loginOverlay" class="overlay">
+        <div class="login-box">
+            <h2><i class="fas fa-user-secret"></i> იდენტიფიკაცია</h2>
+            <input type="text" id="regName" placeholder="სახელი / ზედმეტსახელი">
+            <input type="date" id="regDob" title="დაბადების თარიღი">
+            <select id="regPurpose">
+                <option value="" disabled selected>აირჩიე მიზანი...</option>
+                <option value="coffee">☕ ყავა & საუბარი</option>
+                <option value="dating">❤️ ურთიერთობა</option>
+                <option value="chill">🕶️ დროის გაყვანა</option>
+            </select>
+            <button onclick="completeRegistration()">სისტემაში შესვლა</button>
         </div>
-    </nav>
+    </div>
 
-    <div class="container">
+    <div id="mainApp" class="app-container hidden">
         
-        <div id="authSection" class="section active">
-            <div class="auth-box">
-                <h2>რეგისტრაცია</h2>
-                <input type="text" id="regName" placeholder="სახელი გვარი">
-                <input type="date" id="regDob">
-                <select id="regPurpose">
-                    <option value="coffee">☕ ყავის დალევა</option>
-                    <option value="dating">❤️ დაოჯახება</option>
-                    <option value="hangout">🎉 დროის გაყვანა</option>
-                </select>
-                <button onclick="registerUser()">შესვლა</button>
+        <header>
+            <div class="user-info" onclick="toggleProfile()">
+                <img id="headerAvatar" src="https://ui-avatars.com/api/?name=User&background=random" alt="Avatar">
+                <span id="headerName">მომხმარებელი</span>
             </div>
+            <div class="actions">
+                <button onclick="clearChat()" title="ჩატის გასუფთავება"><i class="fas fa-trash"></i></button>
+                <button onclick="logout()" title="გასვლა"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </header>
+
+        <div id="chatArea" class="chat-area">
+            </div>
+
+        <div class="input-area">
+            <button class="attach-btn"><i class="far fa-smile"></i></button>
+            <input type="text" id="msgInput" placeholder="აკრიფეთ ტექსტი...">
+            <button onclick="sendMsg()" class="send-btn"><i class="fas fa-paper-plane"></i></button>
         </div>
 
-        <div id="profileSection" class="section hidden">
-            <div class="profile-header">
-                <div class="profile-pic-container">
-                    <img id="profilePic" src="https://via.placeholder.com/150" alt="Profile">
-                    <label for="uploadPhoto" class="upload-btn"><i class="fas fa-camera"></i></label>
-                    <input type="file" id="uploadPhoto" accept="image/*" onchange="uploadProfilePhoto(event)" hidden>
+        <div id="profileSidebar" class="profile-sidebar">
+            <button class="close-btn" onclick="toggleProfile()">&times;</button>
+            
+            <div class="profile-content">
+                <div class="profile-img-box">
+                    <img id="profileBigImg" src="https://ui-avatars.com/api/?name=User" alt="Profile">
+                    <label for="photoUpload" class="edit-icon"><i class="fas fa-camera"></i></label>
+                    <input type="file" id="photoUpload" hidden accept="image/*" onchange="handlePhotoUpload(event)">
                 </div>
-                <h2 id="displayName">მომხმარებელი</h2>
-                <p id="displayPurpose" class="badge">მიზანი</p>
-                <p id="displayDate">რეგისტრირებულია: დღეს</p>
-            </div>
+                
+                <h2 id="profileName">სახელი</h2>
+                <p id="profilePurpose" class="tag">მიზანი</p>
+                <p id="profileDob" class="info-text">ასაკი: -</p>
 
-            <div class="profile-actions">
-                <button><i class="fas fa-user-plus"></i> მეგობრებში დამატება</button>
-                <button><i class="fas fa-envelope"></i> პირადი მესიჯი</button>
-            </div>
-
-            <div class="gallery">
-                <h3>ჩემი გალერეა / კედელი</h3>
-                <div class="gallery-grid" id="galleryGrid">
-                    </div>
-            </div>
-        </div>
-
-        <div id="chatSection" class="section hidden">
-            <div class="chat-container">
-                <div class="chat-header">
-                    საერთო ჩატი
+                <div class="stats">
+                    <button><i class="fas fa-user-plus"></i> მეგობრობა</button>
+                    <button><i class="fas fa-envelope"></i> მიწერა</button>
                 </div>
-                <div class="chat-window" id="chatWindow">
-                    </div>
-                <div class="chat-input-area">
-                    <input type="text" id="messageInput" placeholder="დაწერე რამე...">
-                    <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+
+                <div class="gallery-section">
+                    <h3>გალერეა / კედელი</h3>
+                    <div class="gallery-grid" id="userGallery">
+                        </div>
                 </div>
             </div>
         </div>
